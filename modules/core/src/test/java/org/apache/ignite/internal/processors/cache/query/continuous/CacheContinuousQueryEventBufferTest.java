@@ -143,7 +143,7 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
                     cntr,
                     null);
 
-                expEntry.filteredCnt = filtered;
+                expEntry.filteredCount(filtered);
 
                 cntr++;
 
@@ -221,7 +221,7 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
             CacheContinuousQueryEntry actualEvt = actualEntries.get(i);
 
             assertEquals(expEvt.updateCounter(), actualEvt.updateCounter());
-            assertEquals(expEvt.filteredCnt, actualEvt.filteredCnt);
+            assertEquals(expEvt.filteredCount(), actualEvt.filteredCount());
         }
     }
 }

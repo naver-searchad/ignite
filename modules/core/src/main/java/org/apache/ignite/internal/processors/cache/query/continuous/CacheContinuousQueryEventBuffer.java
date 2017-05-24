@@ -217,7 +217,7 @@ public class CacheContinuousQueryEventBuffer {
                                 CacheContinuousQueryEntry evt0 = (CacheContinuousQueryEntry)e;
 
                                 if (!evt0.isFiltered()) {
-                                    evt0.filteredCnt = filtered;
+                                    evt0.filteredCount(filtered);
 
                                     filtered = 0;
 

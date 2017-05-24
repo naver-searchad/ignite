@@ -1097,20 +1097,8 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                 }
 
                 // Check duplicate.
-                if (entry.updateCounter() > lastFiredEvt) {
+                if (entry.updateCounter() > lastFiredEvt)
                     pendingEvts.put(entry.updateCounter(), entry);
-
-                    // TODO
-                    if (entry.filteredCnt > 0) {
-                        long filteredCntr = entry.updateCounter() - entry.filteredCnt;
-
-                        for (long i = 0; i < entry.filteredCnt; i++) {
-                            pendingEvts.put(filteredCntr, HOLE);
-
-                            filteredCntr++;
-                        }
-                    }
-                }
                 else {
                     if (log.isDebugEnabled())
                         log.debug("Skip duplicate continuous query message: " + entry);
@@ -1143,6 +1131,7 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                     }
 
                     LT.warn(log, "Pending events reached max of buffer size [cache=" + cctx.name() +
+                        ", bufSize=" + MAX_BUFF_SIZE +
                         ", partId=" + entry.partition() + ']');
 
                     for (int i = 0; i < MAX_BUFF_SIZE - (MAX_BUFF_SIZE / 10); i++) {
@@ -1157,12 +1146,20 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                     }
                 }
                 else {
-                    // Elements are consistently.
                     while (iter.hasNext()) {
                         Map.Entry<Long, CacheContinuousQueryEntry> e = iter.next();
 
-                        if (e.getKey() == lastFiredEvt + 1) {
-                            ++lastFiredEvt;
+                        CacheContinuousQueryEntry pending = e.getValue();
+
+                        long filtered = pending.filteredCount();
+
+                        boolean fire = entry.updateCounter() == lastFiredEvt + 1;;
+
+                        if (!fire && filtered > 0)
+                            fire = entry.updateCounter() - filtered == lastFiredEvt + 1;
+
+                        if (fire) {
+                            lastFiredEvt = entry.updateCounter();
 
                             if (e.getValue() != HOLE && !e.getValue().isFiltered())
                                 entries.add(new CacheContinuousQueryEvent<K, V>(cache, cctx, e.getValue()));

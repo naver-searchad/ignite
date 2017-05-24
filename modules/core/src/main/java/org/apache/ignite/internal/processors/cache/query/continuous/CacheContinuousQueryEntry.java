@@ -109,7 +109,7 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
     private boolean keepBinary;
 
     /** */
-    public long filteredCnt;
+    private long filteredCnt;
 
     /**
      * Required by {@link Message}.
@@ -204,6 +204,22 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
      */
     void topologyVersion(AffinityTopologyVersion topVer) {
         this.topVer = topVer;
+    }
+
+    /**
+     * @param filteredCnt Number of entries filtered before this entry.
+     */
+    void filteredCount(long filteredCnt) {
+        assert filteredCnt >= 0 : filteredCnt;
+
+        this.filteredCnt = filteredCnt;
+    }
+
+    /**
+     * @return Number of entries filtered before this entry.
+     */
+    long filteredCount() {
+        return filteredCnt;
     }
 
     /**
