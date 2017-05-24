@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.ignite.IgniteSystemProperties;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -30,7 +31,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public class CacheContinuousQueryEventBuffer {
     /** */
-    private static final int BUF_SIZE = 5;
+    private static final int BUF_SIZE =
+        IgniteSystemProperties.getInteger("IGNITE_CONTINUOUS_QUERY_SERVER_BUFFER_SIZE", 5);
 
     /** */
     private AtomicReference<Batch> curBatch = new AtomicReference<>();
