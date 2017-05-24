@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.cache.event.CacheEntryEvent;
 import javax.cache.event.CacheEntryUpdatedListener;
@@ -29,9 +30,12 @@ import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.affinity.Affinity;
 import org.apache.ignite.cache.query.ContinuousQuery;
+import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.util.lang.GridAbsPredicate;
+import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
@@ -155,8 +159,6 @@ public class CacheContinuousQueryConcurrentPartitionUpdateTest extends GridCommo
                 }
             }, THREADS, "update");
 
-            log.info("Finished update");
-
             GridTestUtils.waitForCondition(new GridAbsPredicate() {
                 @Override public boolean apply() {
                     log.info("Events: " + evtCnt.get());
@@ -171,7 +173,132 @@ public class CacheContinuousQueryConcurrentPartitionUpdateTest extends GridCommo
         }
     }
 
-    public void testConcurrentUpdateAndQueryStart() throws Exception {
+    /**
+     * @throws Exception If failed.
+     */
+    public void testConcurrentUpdatesAndQueryStartAtomic() throws Exception {
+        concurrentUpdatesAndQueryStart(ATOMIC);
+    }
 
+    /**
+     * @throws Exception If failed.
+     */
+    public void testConcurrentUpdatesAndQueryStartTx() throws Exception {
+        concurrentUpdatesAndQueryStart(TRANSACTIONAL);
+    }
+
+    /**
+     * @param atomicityMode Cache atomicity mode.
+     * @throws Exception If failed.
+     */
+    private void concurrentUpdatesAndQueryStart(CacheAtomicityMode atomicityMode) throws Exception {
+        Ignite srv = startGrid(0);
+
+        client = true;
+
+        Ignite client = startGrid(1);
+
+        CacheConfiguration ccfg = new CacheConfiguration(DEFAULT_CACHE_NAME);
+
+        ccfg.setWriteSynchronizationMode(FULL_SYNC);
+        ccfg.setAtomicityMode(atomicityMode);
+
+        IgniteCache clientCache = client.createCache(ccfg);
+
+        Affinity<Integer> aff = srv.affinity(DEFAULT_CACHE_NAME);
+
+        final List<Integer> keys = new ArrayList<>();
+
+        final int KEYS = 10;
+
+        for (int i = 0; i < 100_000; i++) {
+            if (aff.partition(i) == 0) {
+                keys.add(i);
+
+                if (keys.size() == KEYS)
+                    break;
+            }
+        }
+
+        assertEquals(KEYS, keys.size());
+
+        final int THREADS = 10;
+        final int UPDATES = 1000;
+
+        for (int i = 0; i < 5; i++) {
+            log.info("Iteration: " + i);
+
+            ContinuousQuery<Object, Object> qry = new ContinuousQuery<>();
+
+            final AtomicInteger evtCnt = new AtomicInteger();
+
+            qry.setLocalListener(new CacheEntryUpdatedListener<Object, Object>() {
+                @Override public void onUpdated(Iterable<CacheEntryEvent<?, ?>> evts) {
+                    for (CacheEntryEvent evt : evts) {
+                        assertNotNull(evt.getKey());
+                        assertNotNull(evt.getValue());
+
+                        if ((Integer)evt.getValue() >= 0)
+                            evtCnt.incrementAndGet();
+                    }
+                }
+            });
+
+            QueryCursor cur;
+
+            final IgniteCache<Object, Object> srvCache = srv.cache(DEFAULT_CACHE_NAME);
+
+            final AtomicBoolean stop = new AtomicBoolean();
+
+            try {
+                IgniteInternalFuture fut = GridTestUtils.runMultiThreadedAsync(new Callable<Void>() {
+                    @Override public Void call() throws Exception {
+                        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+
+                        while (!stop.get())
+                            srvCache.put(keys.get(rnd.nextInt(KEYS)), rnd.nextInt(100) - 200);
+
+                        return null;
+                    }
+                }, THREADS, "update");
+
+                U.sleep(1000);
+
+                cur = clientCache.query(qry);
+
+                U.sleep(1000);
+
+                stop.set(true);
+
+                fut.get();
+            }
+            finally {
+                stop.set(true);
+            }
+
+            GridTestUtils.runMultiThreadedAsync(new Callable<Void>() {
+                @Override public Void call() throws Exception {
+                    ThreadLocalRandom rnd = ThreadLocalRandom.current();
+
+                    for (int i = 0; i < UPDATES; i++)
+                        srvCache.put(keys.get(rnd.nextInt(KEYS)), i);
+
+                    return null;
+                }
+            }, THREADS, "update");
+
+
+            GridTestUtils.waitForCondition(new GridAbsPredicate() {
+                @Override public boolean apply() {
+                    log.info("Events: " + evtCnt.get());
+
+                    return evtCnt.get() >= THREADS * UPDATES;
+                }
+            }, 5000);
+
+            assertEquals(THREADS * UPDATES, evtCnt.get());
+
+            cur.close();
+        }
     }
 }
