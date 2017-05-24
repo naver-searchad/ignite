@@ -897,7 +897,7 @@ public class GridContinuousProcessor extends GridProcessorAdapter {
         throws IgniteCheckedException {
         assert nodeId != null;
         assert routineId != null;
-        assert !msg || obj instanceof Message : obj;
+        assert !msg || (obj instanceof Message || obj instanceof Collection) : obj;
 
         assert !nodeId.equals(ctx.localNodeId());
 
@@ -917,7 +917,13 @@ public class GridContinuousProcessor extends GridProcessorAdapter {
                 syncMsgFuts.put(futId, fut);
 
                 try {
-                    sendNotification(nodeId, routineId, futId, F.asList(obj), null, msg, null);
+                    sendNotification(nodeId,
+                        routineId,
+                        futId,
+                        obj instanceof Collection ? (Collection)obj : F.asList(obj),
+                        null,
+                        msg,
+                        null);
 
                     info.hnd.onBatchAcknowledged(routineId, info.add(obj), ctx);
                 }
@@ -1563,7 +1569,7 @@ public class GridContinuousProcessor extends GridProcessorAdapter {
         GridContinuousBatch addAll(Collection<?> objs) {
             assert objs != null;
 
-            GridContinuousBatch toSnd = null;
+            GridContinuousBatch toSnd;
 
             lock.writeLock().lock();
 

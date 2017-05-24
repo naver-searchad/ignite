@@ -140,7 +140,6 @@ public class IgniteCacheContinuousQueryImmutableEntryTest extends GridCommonAbst
             1L,
             new AffinityTopologyVersion(1L));
 
-        e0.filteredEvents(new GridLongList(new long[]{1L, 2L}));
         e0.markFiltered();
 
         ByteBuffer buf = ByteBuffer.allocate(4096);
@@ -156,7 +155,6 @@ public class IgniteCacheContinuousQueryImmutableEntryTest extends GridCommonAbst
         assertEquals(e0.cacheId(), e1.cacheId());
         assertEquals(e0.eventType(), e1.eventType());
         assertEquals(e0.isFiltered(), e1.isFiltered());
-        assertEquals(GridLongList.asList(e0.filteredEvents()), GridLongList.asList(e1.filteredEvents()));
         assertEquals(e0.isBackup(), e1.isBackup());
         assertEquals(e0.isKeepBinary(), e1.isKeepBinary());
         assertEquals(e0.partition(), e1.partition());

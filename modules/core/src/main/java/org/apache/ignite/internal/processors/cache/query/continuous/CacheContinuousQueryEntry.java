@@ -105,11 +105,11 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
     @GridToStringInclude
     private AffinityTopologyVersion topVer;
 
-    /** Filtered events. */
-    private GridLongList filteredEvts;
-
     /** Keep binary. */
     private boolean keepBinary;
+
+    /** */
+    public long filteredCnt;
 
     /**
      * Required by {@link Message}.
@@ -207,13 +207,6 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
     }
 
     /**
-     * @return Size include this event and filtered.
-     */
-    public int size() {
-        return filteredEvts != null ? filteredEvts.size() + 1 : 1;
-    }
-
-    /**
      * @return If entry filtered then will return light-weight <i><b>new entry</b></i> without values and key
      * (avoid to huge memory consumption), otherwise {@code this}.
      */
@@ -248,20 +241,6 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
      */
     boolean isKeepBinary() {
         return keepBinary;
-    }
-
-    /**
-     * @param cntrs Filtered events.
-     */
-    void filteredEvents(GridLongList cntrs) {
-        filteredEvts = cntrs;
-    }
-
-    /**
-     * @return previous filtered events.
-     */
-    long[] filteredEvents() {
-        return filteredEvts == null ? null : filteredEvts.array();
     }
 
     /**
@@ -363,7 +342,7 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
                 writer.incrementState();
 
             case 2:
-                if (!writer.writeMessage("filteredEvts", filteredEvts))
+                if (!writer.writeLong("filteredCnt", filteredCnt))
                     return false;
 
                 writer.incrementState();
@@ -446,7 +425,7 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
                 reader.incrementState();
 
             case 2:
-                filteredEvts = reader.readMessage("filteredEvts");
+                filteredCnt = reader.readLong("filteredCnt");
 
                 if (!reader.isLastRead())
                     return false;
