@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public class CacheContinuousQueryEventBuffer {
     /** */
+    // TODO increase to 1000
     private static final int BUF_SIZE =
         IgniteSystemProperties.getInteger("IGNITE_CONTINUOUS_QUERY_SERVER_BUFFER_SIZE", 5);
 
