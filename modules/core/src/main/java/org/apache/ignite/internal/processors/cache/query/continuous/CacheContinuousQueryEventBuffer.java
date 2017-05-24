@@ -143,9 +143,9 @@ public class CacheContinuousQueryEventBuffer {
             for (Map.Entry<Long, Object> p : pending.headMap(batch.endCntr, true).entrySet()) {
                 long cntr = p.getKey();
 
-                assert cntr >= batch.startCntr : cntr;
+                assert cntr >= batch.startCntr && cntr <= batch.endCntr : cntr;
 
-                if (cntr <= batch.endCntr && pending.remove(p.getKey()) != null)
+                if (pending.remove(p.getKey()) != null)
                     res = batch.processEvent0(res, p.getKey(), p.getValue());
             }
         }

@@ -141,7 +141,7 @@ public class CacheContinuousQueryConcurrentPartitionUpdateTest extends GridCommo
 
         final IgniteCache<Object, Object> srvCache = srv.cache(DEFAULT_CACHE_NAME);
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 15; i++) {
             log.info("Iteration: " + i);
 
             GridTestUtils.runMultiThreaded(new Callable<Void>() {
