@@ -77,6 +77,7 @@ import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.lang.IgniteAsyncCallback;
 import org.apache.ignite.lang.IgniteBiTuple;
+import org.apache.ignite.spi.communication.tcp.TestDebugLog;
 import org.apache.ignite.thread.IgniteStripedThreadPoolExecutor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -1050,6 +1051,10 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                 if (curTop == AffinityTopologyVersion.NONE) {
                     lastFiredEvt = entry.updateCounter();
 
+                    TestDebugLog.addEntryMessage(entry.partition(),
+                        entry.updateCounter(),
+                        "collect first cntr=" + entry.updateCounter() + " topVer=" + entry.topologyVersion());
+
                     curTop = entry.topologyVersion();
 
                     if (log.isDebugEnabled()) {
@@ -1080,6 +1085,10 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
 
                         lastFiredEvt = entry.updateCounter();
 
+                        TestDebugLog.addEntryMessage(entry.partition(),
+                            entry.updateCounter(),
+                            "collect for lost topVer cntr=" + entry.updateCounter() + " topVer=" + entry.topologyVersion());
+
                         if (!entry.isFiltered())
                             entries.add(new CacheContinuousQueryEvent<K, V>(cache, cctx, entry));
 
@@ -1097,11 +1106,28 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                 }
 
                 // Check duplicate.
-                if (entry.updateCounter() > lastFiredEvt)
+                if (entry.updateCounter() > lastFiredEvt) {
+                    TestDebugLog.addEntryMessage(entry.partition(),
+                        entry.updateCounter(),
+                        "add event last=" + lastFiredEvt +
+                        " cntr=" + entry.updateCounter() +
+                        " key=" + (entry.isFiltered() ? "filtered" : entry.key().value(cctx.cacheObjectContext(), false))  +
+                        " val=" + (entry.isFiltered() ? "filtered" : entry.value().value(cctx.cacheObjectContext(), false))  +
+                        " topVer=" + entry.topologyVersion());
+
                     pendingEvts.put(entry.updateCounter(), entry);
+                }
                 else {
                     if (log.isDebugEnabled())
                         log.debug("Skip duplicate continuous query message: " + entry);
+
+                    TestDebugLog.addEntryMessage(entry.partition(),
+                        entry.updateCounter(),
+                        "skip duplicate last=" + lastFiredEvt +
+                        " cntr=" + entry.updateCounter() +
+                        " key=" + (entry.isFiltered() ? "filtered" : entry.key().value(cctx.cacheObjectContext(), false))  +
+                        " val=" + (entry.isFiltered() ? "filtered" : entry.value().value(cctx.cacheObjectContext(), false))  +
+                        " topVer=" + entry.topologyVersion());
 
                     return Collections.emptyList();
                 }
@@ -1156,9 +1182,18 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                         boolean fire = e.getKey() == lastFiredEvt + 1;;
 
                         if (!fire && filtered > 0)
-                            fire = e.getKey() - filtered == lastFiredEvt + 1;
+                            fire = e.getKey() - filtered <= lastFiredEvt;
 
                         if (fire) {
+                            TestDebugLog.addEntryMessage(entry.partition(),
+                                entry.updateCounter(),
+                                "process last=" + lastFiredEvt +
+                                " cntr=" + e.getKey() +
+                                " key=" + (pending.isFiltered() ? "filtered" : pending.key().value(cctx.cacheObjectContext(), false))  +
+                                " val=" + (pending.isFiltered() ? "filtered" : pending.value().value(cctx.cacheObjectContext(), false))  +
+                                " topVer=" + e.getValue().topologyVersion() +
+                                " f=" + pending.filteredCount());
+
                             lastFiredEvt = e.getKey();
 
                             if (e.getValue() != HOLE && !e.getValue().isFiltered())
@@ -1166,8 +1201,13 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
 
                             iter.remove();
                         }
-                        else
+                        else {
+                            TestDebugLog.addEntryMessage(entry.partition(),
+                                entry.updateCounter(),
+                                "stop process last=" + lastFiredEvt + " cntr=" + e.getKey() + " topVer=" + e.getValue().topologyVersion() + " f=" + pending.filteredCount());
+
                             break;
+                        }
                     }
                 }
             }

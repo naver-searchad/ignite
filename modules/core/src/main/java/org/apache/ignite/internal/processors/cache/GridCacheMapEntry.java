@@ -76,6 +76,7 @@ import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.lang.IgniteBiTuple;
 import org.apache.ignite.lang.IgniteUuid;
+import org.apache.ignite.spi.communication.tcp.TestDebugLog;
 import org.jetbrains.annotations.Nullable;
 
 import static org.apache.ignite.events.EventType.EVT_CACHE_OBJECT_EXPIRED;
@@ -1842,6 +1843,11 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
             if (lsnrs != null) {
                 CacheObject evtVal = cctx.unwrapTemporary(updateVal);
                 CacheObject evtOldVal = cctx.unwrapTemporary(oldVal);
+
+                if (primary)
+                    TestDebugLog.addEntryMessage(partition(), evtVal.value(cctx.cacheObjectContext(), false), "primary notify cntr=" + c.updateRes.updateCounter() + " k=" + key.value(null, false));
+                else
+                    TestDebugLog.addEntryMessage(key.value(null, false), evtVal.value(cctx.cacheObjectContext(), false), "backup notify cntr=" + c.updateRes.updateCounter() + " k=" + key.value(null, false));
 
                 cctx.continuousQueries().onEntryUpdated(lsnrs,
                     key,

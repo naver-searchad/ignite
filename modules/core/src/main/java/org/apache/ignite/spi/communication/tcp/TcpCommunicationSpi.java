@@ -2891,24 +2891,24 @@ public class TcpCommunicationSpi extends IgniteSpiAdapter implements Communicati
                 allInetAddrs.add(addr.getAddress());
         }
 
-        List<InetAddress> reachableInetAddrs = U.filterReachable(allInetAddrs);
-
-        if (reachableInetAddrs.size() < allInetAddrs.size()) {
-            LinkedHashSet<InetSocketAddress> addrs0 = U.newLinkedHashSet(addrs.size());
-
-            List<InetSocketAddress> unreachableInetAddr = new ArrayList<>(allInetAddrs.size() - reachableInetAddrs.size());
-
-            for (InetSocketAddress addr : addrs) {
-                if (reachableInetAddrs.contains(addr.getAddress()))
-                    addrs0.add(addr);
-                else
-                    unreachableInetAddr.add(addr);
-            }
-
-            addrs0.addAll(unreachableInetAddr);
-
-            addrs = addrs0;
-        }
+//        List<InetAddress> reachableInetAddrs = U.filterReachable(allInetAddrs);
+//
+//        if (reachableInetAddrs.size() < allInetAddrs.size()) {
+//            LinkedHashSet<InetSocketAddress> addrs0 = U.newLinkedHashSet(addrs.size());
+//
+//            List<InetSocketAddress> unreachableInetAddr = new ArrayList<>(allInetAddrs.size() - reachableInetAddrs.size());
+//
+//            for (InetSocketAddress addr : addrs) {
+//                if (reachableInetAddrs.contains(addr.getAddress()))
+//                    addrs0.add(addr);
+//                else
+//                    unreachableInetAddr.add(addr);
+//            }
+//
+//            addrs0.addAll(unreachableInetAddr);
+//
+//            addrs = addrs0;
+//        }
 
         if (log.isDebugEnabled())
             log.debug("Addresses to connect for node [rmtNode=" + node.id() + ", addrs=" + addrs.toString() + ']');

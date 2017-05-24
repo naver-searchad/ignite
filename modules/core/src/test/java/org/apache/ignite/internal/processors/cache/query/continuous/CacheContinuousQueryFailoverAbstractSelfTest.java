@@ -95,6 +95,7 @@ import org.apache.ignite.plugin.extensions.communication.Message;
 import org.apache.ignite.resources.LoggerResource;
 import org.apache.ignite.spi.IgniteSpiException;
 import org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi;
+import org.apache.ignite.spi.communication.tcp.TestDebugLog;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
@@ -1222,8 +1223,15 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
             if (!lostAllow && lostEvts.size() > 100) {
                 log.error("Lost event cnt: " + lostEvts.size());
 
-                for (T3<Object, Object, Object> e : lostEvts)
-                    log.error("Lost event: " + e);
+                for (T3<Object, Object, Object> e : lostEvts) {
+                    log.error("Lost event: " + ignite(0).affinity(DEFAULT_CACHE_NAME).partition(e.get1()) + " " + e);
+
+                    TestDebugLog.addEntryMessage(ignite(0).affinity(DEFAULT_CACHE_NAME).partition(e.get1()), e.get2(), "lost event " + e.get1() + " " + e.get2());
+
+                    TestDebugLog.printKeyMessages(true, ignite(0).affinity(DEFAULT_CACHE_NAME).partition(e.get1()));
+
+                    System.exit(1);
+                }
 
                 fail("Lose events, see log for details.");
             }
@@ -1645,10 +1653,6 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
 
         QueryCursor<?> cur = qryClnCache.query(qry);
 
-        CacheEventListener2 dinLsnr = null;
-
-        QueryCursor<?> dinQry = null;
-
         final AtomicBoolean stop = new AtomicBoolean();
 
         final AtomicReference<CountDownLatch> checkLatch = new AtomicReference<>();
@@ -1659,22 +1663,24 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                     final int idx = ThreadLocalRandom.current().nextInt(SRV_NODES - 1);
 
                     log.info("Stop node: " + idx);
+                    TestDebugLog.addMessage("Stop node: " + idx);
 
                     awaitPartitionMapExchange();
 
-                    Thread.sleep(400);
+                    Thread.sleep(100);
 
                     stopGrid(idx);
 
                     awaitPartitionMapExchange();
 
-                    Thread.sleep(400);
+                    Thread.sleep(100);
 
                     log.info("Start node: " + idx);
+                    TestDebugLog.addMessage("Start node: " + idx);
 
                     startGrid(idx);
 
-                    Thread.sleep(200);
+                    Thread.sleep(100);
 
                     CountDownLatch latch = new CountDownLatch(1);
 
@@ -1695,7 +1701,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
 
         final Map<Integer, List<T2<Integer, Integer>>> expEvts = new HashMap<>();
 
-        final List<T3<Object, Object, Object>> expEvtsNewLsnr = new ArrayList<>();
+        //final List<T3<Object, Object, Object>> expEvtsNewLsnr = new ArrayList<>();
 
         final List<T3<Object, Object, Object>> expEvtsLsnr = new ArrayList<>();
 
@@ -1703,7 +1709,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
             long stopTime = System.currentTimeMillis() + 60_000;
 
             // Start new filter each 5 sec.
-            long startFilterTime = System.currentTimeMillis() + 5_000;
+            //long startFilterTime = System.currentTimeMillis() + 5_000;
 
             final int PARTS = qryClient.affinity(DEFAULT_CACHE_NAME).partitions();
 
@@ -1719,30 +1725,30 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                 Integer prevVal = vals.get(key);
                 Integer val = vals.get(key);
 
-                if (System.currentTimeMillis() > startFilterTime) {
-                    // Stop filter and check events.
-                    if (dinQry != null) {
-                        dinQry.close();
-
-                        log.info("Continuous query listener closed. Await events: " + expEvtsNewLsnr.size());
-
-                        checkEvents(expEvtsNewLsnr, dinLsnr, backups == 0);
-                    }
-
-                    dinLsnr = new CacheEventListener2();
-
-                    ContinuousQuery<Object, Object> newQry = new ContinuousQuery<>();
-
-                    newQry.setLocalListener(dinLsnr);
-
-                    newQry.setRemoteFilter(asyncCallback() ? new CacheEventAsyncFilter() : new CacheEventFilter());
-
-                    dinQry = qryClnCache.query(newQry);
-
-                    log.info("Continuous query listener started.");
-
-                    startFilterTime = System.currentTimeMillis() + 5_000;
-                }
+//                if (System.currentTimeMillis() > startFilterTime) {
+//                    // Stop filter and check events.
+//                    if (dinQry != null) {
+//                        dinQry.close();
+//
+//                        log.info("Continuous query listener closed. Await events: " + expEvtsNewLsnr.size());
+//
+//                        checkEvents(expEvtsNewLsnr, dinLsnr, backups == 0);
+//                    }
+//
+//                    dinLsnr = new CacheEventListener2();
+//
+//                    ContinuousQuery<Object, Object> newQry = new ContinuousQuery<>();
+//
+//                    newQry.setLocalListener(dinLsnr);
+//
+//                    newQry.setRemoteFilter(asyncCallback() ? new CacheEventAsyncFilter() : new CacheEventFilter());
+//
+//                    dinQry = qryClnCache.query(newQry);
+//
+//                    log.info("Continuous query listener started.");
+//
+//                    startFilterTime = System.currentTimeMillis() + 5_000;
+//                }
 
                 if (val == null)
                     val = 0;
@@ -1752,20 +1758,23 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                 if (filtered)
                     val = -val;
 
-                if (processorPut && prevVal != null) {
-                    qryClnCache.invoke(key, new CacheEntryProcessor<Object, Object, Void>() {
-                        @Override public Void process(MutableEntry<Object, Object> entry,
-                            Object... arguments) throws EntryProcessorException {
-                            entry.setValue(arguments[0]);
+//                if (processorPut && prevVal != null) {
+//                    qryClnCache.invoke(key, new CacheEntryProcessor<Object, Object, Void>() {
+//                        @Override public Void process(MutableEntry<Object, Object> entry,
+//                            Object... arguments) throws EntryProcessorException {
+//                            entry.setValue(arguments[0]);
+//
+//                            return null;
+//                        }
+//                    }, val);
+//                }
+//                else
 
-                            return null;
-                        }
-                    }, val);
-                }
-                else
-                    qryClnCache.put(key, val);
+                TestDebugLog.addEntryMessage(ignite(4).affinity(DEFAULT_CACHE_NAME).partition(key), val, "do put " + key + " " + val);
 
-                processorPut = !processorPut;
+                qryClnCache.put(key, val);
+
+                //processorPut = !processorPut;
 
                 vals.put(key, val);
 
@@ -1784,8 +1793,8 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
 
                     expEvtsLsnr.add(tupVal);
 
-                    if (dinQry != null)
-                        expEvtsNewLsnr.add(tupVal);
+//                    if (dinQry != null)
+//                        expEvtsNewLsnr.add(tupVal);
                 }
 
                 filtered = !filtered;
@@ -1793,7 +1802,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                 CountDownLatch latch = checkLatch.get();
 
                 if (latch != null) {
-                    log.info("Check events.");
+                    log.info("Check events " + expEvtsLsnr.size());
 
                     checkLatch.set(null);
 
@@ -1808,6 +1817,8 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                         success = true;
 
                         log.info("Events checked.");
+
+                        //TestDebugLog.clear();
                     }
                     finally {
                         if (!success)
@@ -1834,12 +1845,12 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
         lsnr.evts.clear();
         lsnr.vals.clear();
 
-        if (dinQry != null) {
-            checkEvents(expEvtsNewLsnr, dinLsnr, backups == 0);
-
-            dinLsnr.evts.clear();
-            dinLsnr.vals.clear();
-        }
+//        if (dinQry != null) {
+//            checkEvents(expEvtsNewLsnr, dinLsnr, backups == 0);
+//
+//            dinLsnr.evts.clear();
+//            dinLsnr.vals.clear();
+//        }
 
         List<T3<Object, Object, Object>> afterRestEvts = new ArrayList<>();
 
@@ -1855,11 +1866,11 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
 
         cur.close();
 
-        if (dinQry != null) {
-            checkEvents(new ArrayList<>(afterRestEvts), dinLsnr, false);
-
-            dinQry.close();
-        }
+//        if (dinQry != null) {
+//            checkEvents(new ArrayList<>(afterRestEvts), dinLsnr, false);
+//
+//            dinQry.close();
+//        }
 
         assertFalse("Unexpected error during test, see log for details.", err);
     }

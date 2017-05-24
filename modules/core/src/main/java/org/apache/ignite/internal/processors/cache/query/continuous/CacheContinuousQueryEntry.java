@@ -231,9 +231,18 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
             return this;
 
         CacheContinuousQueryEntry e = new CacheContinuousQueryEntry(
-                cacheId, null, null, null, null, keepBinary, part, updateCntr, topVer);
+            cacheId,
+            null,
+            null,
+            null,
+            null,
+            keepBinary,
+            part,
+            updateCntr,
+            topVer);
 
         e.flags = flags;
+        e.filteredCnt = filteredCnt;
 
         return e;
     }
