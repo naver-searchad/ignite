@@ -1153,13 +1153,13 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
 
                         long filtered = pending.filteredCount();
 
-                        boolean fire = entry.updateCounter() == lastFiredEvt + 1;;
+                        boolean fire = e.getKey() == lastFiredEvt + 1;;
 
                         if (!fire && filtered > 0)
-                            fire = entry.updateCounter() - filtered == lastFiredEvt + 1;
+                            fire = e.getKey() - filtered == lastFiredEvt + 1;
 
                         if (fire) {
-                            lastFiredEvt = entry.updateCounter();
+                            lastFiredEvt = e.getKey();
 
                             if (e.getValue() != HOLE && !e.getValue().isFiltered())
                                 entries.add(new CacheContinuousQueryEvent<K, V>(cache, cctx, e.getValue()));
