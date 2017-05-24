@@ -1156,7 +1156,7 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                         boolean fire = e.getKey() == lastFiredEvt + 1;;
 
                         if (!fire && filtered > 0)
-                            fire = e.getKey() - filtered == lastFiredEvt + 1;
+                            fire = e.getKey() - filtered <= lastFiredEvt + 1;
 
                         if (fire) {
                             lastFiredEvt = e.getKey();
