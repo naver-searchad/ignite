@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.ignite.IgniteSystemProperties;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.spi.communication.tcp.TestDebugLog;
+import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -77,7 +78,7 @@ public class CacheContinuousQueryEventBuffer {
      * @return Backup entries.
      */
     @Nullable Collection<CacheContinuousQueryEntry> resetBackupQueue() {
-        Collection<CacheContinuousQueryEntry> ret = null;
+        Collection<CacheContinuousQueryEntry> ret;
 
         List<CacheContinuousQueryEntry> entries = null;
 
@@ -87,12 +88,10 @@ public class CacheContinuousQueryEventBuffer {
             entries = batch.backupFlushEntries();
 
         if (!backupQ.isEmpty()) {
-            ret = this.backupQ;
+            if (entries != null)
+                backupQ.addAll(entries);
 
-            if (entries != null) {
-                for (CacheContinuousQueryEntry e : entries)
-                    ((ConcurrentLinkedDeque)ret).addFirst(e);
-            }
+            ret = this.backupQ;
 
             backupQ = new ConcurrentLinkedDeque<>();
         }
@@ -106,10 +105,8 @@ public class CacheContinuousQueryEventBuffer {
                     "filtered1 " + e.filteredCount() +
                         " reset backup");
         }
-        else
-            TestDebugLog.addEntryMessage(part, part, "no backup");
 
-        return entries;
+        return ret;
     }
 
     /**
@@ -151,8 +148,6 @@ public class CacheContinuousQueryEventBuffer {
         Batch batch = initBatch(entry.topologyVersion());
 
         if (batch == null || cntr < batch.startCntr) {
-            assert entry != null : cntr;
-
             if (backup)
                 backupQ.add(entry);
 
@@ -196,6 +191,7 @@ public class CacheContinuousQueryEventBuffer {
     }
 
     /**
+     * @param topVer Current event topology version.
      * @return Current batch.
      */
     @Nullable private Batch initBatch(AffinityTopologyVersion topVer) {
@@ -265,6 +261,7 @@ public class CacheContinuousQueryEventBuffer {
         /**
          * @param filtered Number of filtered events before this batch.
          * @param entries Entries array.
+         * @param topVer Current event topology version.
          * @param startCntr Start counter.
          */
         Batch(long startCntr, long filtered, CacheContinuousQueryEntry[] entries, AffinityTopologyVersion topVer) {
@@ -279,7 +276,10 @@ public class CacheContinuousQueryEventBuffer {
             endCntr = startCntr + BUF_SIZE - 1;
         }
 
-        synchronized List<CacheContinuousQueryEntry> backupFlushEntries() {
+        /**
+         * @return Entries to send as part of backup queue.
+         */
+        @Nullable synchronized List<CacheContinuousQueryEntry> backupFlushEntries() {
             List<CacheContinuousQueryEntry> res = null;
 
             long filtered = this.filtered;
@@ -337,6 +337,11 @@ public class CacheContinuousQueryEventBuffer {
             return res;
         }
 
+        /**
+         * @param cntr Entry counter.
+         * @param filtered Number of entries filtered before this entry.
+         * @return Entry.
+         */
         private CacheContinuousQueryEntry filteredEntry(long cntr, long filtered) {
             CacheContinuousQueryEntry e = new CacheContinuousQueryEntry(0,
                 null,

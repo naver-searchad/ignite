@@ -246,7 +246,7 @@ class CacheContinuousQueryPartitionRecovery {
                 }
             }
             else {
-                boolean skip = false;
+                boolean skippedFiltered = false;
 
                 while (iter.hasNext()) {
                     Map.Entry<Long, CacheContinuousQueryEntry> e = iter.next();
@@ -277,18 +277,20 @@ class CacheContinuousQueryPartitionRecovery {
 
                         iter.remove();
                     }
-                    else if (!pending.isFiltered()) {
-                        skip = true;
+                    else {
+                        if (pending.isFiltered())
+                            skippedFiltered = true;
+                        else {
+                            TestDebugLog.addEntryMessage(entry.partition(),
+                                entry.updateCounter(),
+                                "stop process last=" + lastFiredEvt + " cntr=" + e.getKey() + " topVer=" + e.getValue().topologyVersion() + " f=" + pending.filteredCount());
 
-                        TestDebugLog.addEntryMessage(entry.partition(),
-                            entry.updateCounter(),
-                            "stop process last=" + lastFiredEvt + " cntr=" + e.getKey() + " topVer=" + e.getValue().topologyVersion() + " f=" + pending.filteredCount());
-
-                        break;
+                            break;
+                        }
                     }
                 }
 
-                if (skip)
+                if (skippedFiltered)
                     pendingEvts.headMap(lastFiredEvt).clear();
             }
         }
