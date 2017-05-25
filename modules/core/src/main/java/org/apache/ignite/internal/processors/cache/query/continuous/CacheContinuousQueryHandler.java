@@ -892,6 +892,8 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
 
         CacheContinuousQueryEventBuffer buf = partitionBuffer(cctx, e.partition());
 
+        e.markBackup();
+
         buf.processEntry(e.forBackupQueue(), true);
     }
 
