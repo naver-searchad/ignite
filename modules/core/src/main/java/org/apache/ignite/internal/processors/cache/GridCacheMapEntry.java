@@ -1838,6 +1838,8 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
             if (updateRes.success())
                 updateMetrics(c.op, metrics);
 
+            lsnrs = cctx.continuousQueries().updateListeners(internal, false);
+
             // Continuous query filter should be perform under lock.
             if (lsnrs != null) {
                 CacheObject evtVal = cctx.unwrapTemporary(updateVal);
