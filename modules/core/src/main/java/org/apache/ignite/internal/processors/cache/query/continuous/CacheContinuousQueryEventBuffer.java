@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.ignite.IgniteSystemProperties;
+import org.apache.ignite.spi.communication.tcp.TestDebugLog;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -40,6 +41,17 @@ public class CacheContinuousQueryEventBuffer {
 
     /** */
     private ConcurrentSkipListMap<Long, Object> pending = new ConcurrentSkipListMap<>();
+
+    /** */
+    private final int part;
+
+    public CacheContinuousQueryEventBuffer() {
+        part = 0;
+    }
+
+    public CacheContinuousQueryEventBuffer(int part) {
+        this.part = part;
+    }
 
     /**
      * @return Initial partition counter.
@@ -88,6 +100,12 @@ public class CacheContinuousQueryEventBuffer {
         if (batch == null || cntr < batch.startCntr) {
             assert entry != null : cntr;
 
+            TestDebugLog.addEntryMessage(part,
+                cntr,
+                "buffer rcd small start=" + batch.startCntr +
+                    " cntr=" + cntr +
+                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());
+
             return entry;
         }
 
@@ -95,8 +113,15 @@ public class CacheContinuousQueryEventBuffer {
 
         if (cntr <= batch.endCntr)
             res = batch.processEvent0(null, cntr, entry);
-        else
+        else {
+            TestDebugLog.addEntryMessage(part,
+                cntr,
+                "buffer add pending start=" + batch.startCntr +
+                    " cntr=" + cntr +
+                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());
+
             pending.put(cntr, entry);
+        }
 
         Batch batch0 = curBatch.get();
 
@@ -127,6 +152,8 @@ public class CacheContinuousQueryEventBuffer {
 
         if (curCntr == -1)
             return null;
+
+        TestDebugLog.addEntryMessage(part, curCntr, "created batch");
 
         batch = new Batch(curCntr + 1, 0L, new Object[BUF_SIZE]);
 
@@ -205,6 +232,13 @@ public class CacheContinuousQueryEventBuffer {
             int pos = (int)(cntr - startCntr);
 
             synchronized (this) {
+                TestDebugLog.addEntryMessage(part,
+                    cntr,
+                    "buffer process start=" + startCntr +
+                        ", lastProc=" + lastProc +
+                        " pos=" + pos +
+                        " topVer=" + ((CacheContinuousQueryEntry)evt).topologyVersion());
+
                 evts[pos] = evt;
 
                 int next = lastProc + 1;

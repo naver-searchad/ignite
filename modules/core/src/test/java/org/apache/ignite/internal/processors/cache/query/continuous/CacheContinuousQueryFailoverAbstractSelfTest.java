@@ -1220,15 +1220,15 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                 }
             }
 
-            if (!lostAllow && lostEvts.size() > 100) {
+            if (!lostAllow && lostEvts.size() > 50) {
                 log.error("Lost event cnt: " + lostEvts.size());
 
                 for (T3<Object, Object, Object> e : lostEvts) {
-                    log.error("Lost event: " + ignite(0).affinity(DEFAULT_CACHE_NAME).partition(e.get1()) + " " + e);
+                    log.error("Lost event: " + ignite(4).affinity(DEFAULT_CACHE_NAME).partition(e.get1()) + " " + e);
 
-                    TestDebugLog.addEntryMessage(ignite(0).affinity(DEFAULT_CACHE_NAME).partition(e.get1()), e.get2(), "lost event " + e.get1() + " " + e.get2());
+                    TestDebugLog.addEntryMessage(ignite(4).affinity(DEFAULT_CACHE_NAME).partition(e.get1()), e.get2(), "lost event " + e.get1() + " " + e.get2());
 
-                    TestDebugLog.printKeyMessages(true, ignite(0).affinity(DEFAULT_CACHE_NAME).partition(e.get1()));
+                    TestDebugLog.printKeyMessages(true, ignite(4).affinity(DEFAULT_CACHE_NAME).partition(e.get1()));
 
                     System.exit(1);
                 }
@@ -1598,6 +1598,8 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
         for (int i = 0; i < 10; i++) {
             final int idx = i % (SRV_NODES - 1);
 
+            TestDebugLog.addMessage("Stop node: " + idx);
+
             log.info("Stop node: " + idx);
 
             stopGrid(idx);
@@ -1609,12 +1611,16 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
             for (int j = 0; j < aff.partitions(); j++) {
                 Integer oldVal = (Integer)qryClnCache.get(j);
 
+                TestDebugLog.addEntryMessage(ignite(4).affinity(DEFAULT_CACHE_NAME).partition(j), i, "do put " + j + " " + i);
+
                 qryClnCache.put(j, i);
 
                 afterRestEvts.add(new T3<>((Object)j, (Object)i, (Object)oldVal));
             }
 
             checkEvents(new ArrayList<>(afterRestEvts), lsnr, false);
+
+            TestDebugLog.addMessage("Start node: " + idx);
 
             log.info("Start node: " + idx);
 

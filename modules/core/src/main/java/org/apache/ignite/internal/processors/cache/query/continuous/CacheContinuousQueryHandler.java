@@ -775,8 +775,14 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
 
             Collection<CacheContinuousQueryEntry> backupQueue0 = backupQueue;
 
-            if (backupQueue0 != null)
+            if (backupQueue0 != null) {
+                TestDebugLog.addEntryMessage(entry.partition(),
+                    entry.updateCounter(),
+                    "add backup " +
+                        " topVer=" + entry.topologyVersion());
+
                 backupQueue0.add(entry.forBackupQueue());
+            }
         }
 
         return notify;
@@ -948,7 +954,7 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
         if (buf == null) {
             final int part = e.partition();
 
-            buf = new CacheContinuousQueryEventBuffer() {
+            buf = new CacheContinuousQueryEventBuffer(part) {
                 @Override protected long currentPartitionCounter() {
                     GridDhtLocalPartition locPart = cctx.topology().localPartition(part, null, false);
 
@@ -1182,7 +1188,7 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                         boolean fire = e.getKey() == lastFiredEvt + 1;;
 
                         if (!fire && filtered > 0)
-                            fire = e.getKey() - filtered <= lastFiredEvt;
+                            fire = e.getKey() - filtered <= lastFiredEvt + 1;
 
                         if (fire) {
                             TestDebugLog.addEntryMessage(entry.partition(),

@@ -1845,9 +1845,12 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
                 CacheObject evtOldVal = cctx.unwrapTemporary(oldVal);
 
                 if (primary)
-                    TestDebugLog.addEntryMessage(partition(), evtVal.value(cctx.cacheObjectContext(), false), "primary notify cntr=" + c.updateRes.updateCounter() + " k=" + key.value(null, false));
+                    TestDebugLog.addEntryMessage(partition(), topVer, // evtVal.value(cctx.cacheObjectContext(), false)
+                        "primary notify cntr=" + c.updateRes.updateCounter() +
+                            " k=" + key.value(null, false));
                 else
-                    TestDebugLog.addEntryMessage(key.value(null, false), evtVal.value(cctx.cacheObjectContext(), false), "backup notify cntr=" + c.updateRes.updateCounter() + " k=" + key.value(null, false));
+                    TestDebugLog.addEntryMessage(key.value(null, false), topVer,
+                        "backup notify cntr=" + c.updateRes.updateCounter() + " k=" + key.value(null, false));
 
                 cctx.continuousQueries().onEntryUpdated(lsnrs,
                     key,
