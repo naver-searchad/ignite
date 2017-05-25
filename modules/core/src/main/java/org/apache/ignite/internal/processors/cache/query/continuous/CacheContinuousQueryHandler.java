@@ -456,6 +456,8 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
 
                         if (backupQueue != null && node != null) {
                             for (CacheContinuousQueryEntry e : backupQueue) {
+                                e.markBackup();
+
                                 if (!e.isFiltered())
                                     prepareEntry(cctx, nodeId, e);
                             }
@@ -890,8 +892,6 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
             return;
 
         CacheContinuousQueryEventBuffer buf = partitionBuffer(cctx, e.partition());
-
-        e.markBackup();
 
         buf.processEntry(e.forBackupQueue(), true);
     }
