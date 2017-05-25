@@ -102,7 +102,7 @@ public class CacheContinuousQueryEventBuffer {
             for (CacheContinuousQueryEntry e : ret)
                 TestDebugLog.addEntryMessage(part,
                     e.updateCounter(),
-                    "filtered1 " + e.filteredCount() +
+                    "filtered " + e.filteredCount() +
                         " reset backup");
         }
 
