@@ -66,14 +66,14 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
         for (int i = 0; i < 10; i++) {
             int cnt = rnd.nextInt(10_000) + 1;
 
-            testBuffer(rnd, new CacheContinuousQueryEventBuffer(), cnt, 1, 0.5f, threads);
-            testBuffer(rnd, new CacheContinuousQueryEventBuffer(), cnt, 1, 0.9f, threads);
-            testBuffer(rnd, new CacheContinuousQueryEventBuffer(), cnt, 1, 0.99f, threads);
-            testBuffer(rnd, new CacheContinuousQueryEventBuffer(), cnt, 1, 0.01f, threads);
-            testBuffer(rnd, new CacheContinuousQueryEventBuffer(), cnt, 1, 0.f, threads);
+            testBuffer(rnd, new CacheContinuousQueryEventBuffer(0), cnt, 1, 0.5f, threads);
+            testBuffer(rnd, new CacheContinuousQueryEventBuffer(0), cnt, 1, 0.9f, threads);
+            testBuffer(rnd, new CacheContinuousQueryEventBuffer(0), cnt, 1, 0.99f, threads);
+            testBuffer(rnd, new CacheContinuousQueryEventBuffer(0), cnt, 1, 0.01f, threads);
+            testBuffer(rnd, new CacheContinuousQueryEventBuffer(0), cnt, 1, 0.f, threads);
         }
 
-        CacheContinuousQueryEventBuffer b = new CacheContinuousQueryEventBuffer();
+        CacheContinuousQueryEventBuffer b = new CacheContinuousQueryEventBuffer(0);
 
         long cntr = 1;
 
@@ -106,32 +106,31 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
     {
         List<CacheContinuousQueryEntry> expEntries = new ArrayList<>();
 
-        List<Object> entries = new ArrayList<>();
+        List<CacheContinuousQueryEntry> entries = new ArrayList<>();
 
         long filtered = b.currentFiltered();
 
         for (int i = 0; i < cnt; i++) {
-            if (rnd.nextFloat() < filterRatio) {
-                entries.add(cntr);
+            CacheContinuousQueryEntry entry = new CacheContinuousQueryEntry(
+                0,
+                EventType.CREATED,
+                null,
+                null,
+                null,
+                false,
+                0,
+                cntr,
+                null);
 
-                cntr++;
+
+            entries.add(entry);
+
+            if (rnd.nextFloat() < filterRatio) {
+                entry.markFiltered();
 
                 filtered++;
             }
             else {
-                CacheContinuousQueryEntry entry = new CacheContinuousQueryEntry(
-                    0,
-                    EventType.CREATED,
-                    null,
-                    null,
-                    null,
-                    false,
-                    0,
-                    cntr,
-                    null);
-
-                entries.add(entry);
-
                 CacheContinuousQueryEntry expEntry = new CacheContinuousQueryEntry(
                     0,
                     EventType.CREATED,
@@ -145,12 +144,12 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
 
                 expEntry.filteredCount(filtered);
 
-                cntr++;
-
                 expEntries.add(expEntry);
 
                 filtered = 0;
             }
+
+            cntr++;
         }
 
         Collections.shuffle(entries, rnd);
@@ -161,12 +160,7 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
             for (int i = 0; i < entries.size(); i++) {
                 Object o = entries.get(i);
 
-                Object res;
-
-                if (o instanceof Long)
-                    res = b.processFiltered((Long)o);
-                else
-                    res = b.processEntry((CacheContinuousQueryEntry)o);
+                Object res = b.processEntry((CacheContinuousQueryEntry)o, false);
 
                 if (res != null) {
                     if (res instanceof CacheContinuousQueryEntry)
@@ -179,7 +173,7 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
         else {
             final CyclicBarrier barrier = new CyclicBarrier(threads);
 
-            final ConcurrentLinkedQueue<Object> q = new ConcurrentLinkedQueue<>(entries);
+            final ConcurrentLinkedQueue<CacheContinuousQueryEntry> q = new ConcurrentLinkedQueue<>(entries);
 
             final ConcurrentSkipListMap<Long, CacheContinuousQueryEntry> act0 = new ConcurrentSkipListMap<>();
 
@@ -190,12 +184,7 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
                     Object o;
 
                     while ((o = q.poll()) != null) {
-                        Object res;
-
-                        if (o instanceof Long)
-                            res = b.processFiltered((Long)o);
-                        else
-                            res = b.processEntry((CacheContinuousQueryEntry)o);
+                        Object res = b.processEntry((CacheContinuousQueryEntry)o, false);
 
                         if (res != null) {
                             if (res instanceof CacheContinuousQueryEntry)
