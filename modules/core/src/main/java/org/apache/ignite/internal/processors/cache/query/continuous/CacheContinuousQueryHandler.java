@@ -458,8 +458,6 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                             for (CacheContinuousQueryEntry e : backupQueue) {
                                 if (!e.isFiltered())
                                     prepareEntry(cctx, nodeId, e);
-
-                                e.topologyVersion(topVer);
                             }
 
                             ctx.continuous().addBackupNotification(nodeId, routineId, backupQueue, topic);

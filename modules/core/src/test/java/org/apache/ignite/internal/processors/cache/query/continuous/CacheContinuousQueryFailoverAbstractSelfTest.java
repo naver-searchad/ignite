@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ThreadLocalRandom;
@@ -2421,7 +2422,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
         private ConcurrentHashMap<Object, CacheEntryEvent<?, ?>> evts = new ConcurrentHashMap<>();
 
         /** */
-        private List<CacheEntryEvent<?, ?>> allEvts;
+        private final CopyOnWriteArrayList<CacheEntryEvent<?, ?>> allEvts;
 
         /** */
         @LoggerResource
@@ -2431,8 +2432,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
          * @param saveAll Save all events flag.
          */
         CacheEventListener1(boolean saveAll) {
-            if (saveAll)
-                allEvts = new ArrayList<>();
+            allEvts = saveAll ? new CopyOnWriteArrayList<CacheEntryEvent<?, ?>>() : null;
         }
 
         /** {@inheritDoc} */
