@@ -96,6 +96,13 @@ public class CacheContinuousQueryEventBuffer {
         else
             ret = entries;
 
+        if (!pending.isEmpty()) {
+            if (ret == null)
+                ret = new ArrayList<>();
+
+            ret.addAll(pending.values());
+        }
+
         return ret;
     }
 
