@@ -31,7 +31,10 @@ import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.internal.LT;
+import org.apache.ignite.spi.communication.tcp.TestDebugLog;
 import org.jetbrains.annotations.Nullable;
+
+import static org.apache.ignite.internal.processors.cache.query.continuous.CacheContinuousQueryHandler.LSNR_MAX_BUF_SIZE;
 
 /**
  *
@@ -41,7 +44,7 @@ class CacheContinuousQueryPartitionRecovery {
     private static final CacheContinuousQueryEntry HOLE = new CacheContinuousQueryEntry();
 
     /** */
-    private final static int MAX_BUFF_SIZE = CacheContinuousQueryHandler.LSNR_MAX_BUF_SIZE;
+    private final static int MAX_BUFF_SIZE = LSNR_MAX_BUF_SIZE;
 
     /** */
     private IgniteLogger log;
@@ -116,6 +119,10 @@ class CacheContinuousQueryPartitionRecovery {
             if (curTop == AffinityTopologyVersion.NONE) {
                 lastFiredEvt = entry.updateCounter();
 
+                TestDebugLog.addEntryMessage(entry.partition(),
+                    entry.updateCounter(),
+                    "collect first cntr=" + entry.updateCounter() + " topVer=" + entry.topologyVersion());
+
                 curTop = entry.topologyVersion();
 
                 if (log.isDebugEnabled()) {
@@ -146,6 +153,10 @@ class CacheContinuousQueryPartitionRecovery {
 
                     lastFiredEvt = entry.updateCounter();
 
+                    TestDebugLog.addEntryMessage(entry.partition(),
+                        entry.updateCounter(),
+                        "collect for lost topVer cntr=" + entry.updateCounter() + " topVer=" + entry.topologyVersion());
+
                     if (!entry.isFiltered())
                         entries.add(new CacheContinuousQueryEvent<K, V>(cache, cctx, entry));
 
@@ -163,11 +174,28 @@ class CacheContinuousQueryPartitionRecovery {
             }
 
             // Check duplicate.
-            if (entry.updateCounter() > lastFiredEvt)
+            if (entry.updateCounter() > lastFiredEvt) {
+                TestDebugLog.addEntryMessage(entry.partition(),
+                    entry.updateCounter(),
+                    "add event last=" + lastFiredEvt +
+                        " cntr=" + entry.updateCounter() +
+                        " key=" + (entry.isFiltered() ? "filtered" : entry.key().value(cctx.cacheObjectContext(), false))  +
+                        " val=" + (entry.isFiltered() ? "filtered" : entry.value().value(cctx.cacheObjectContext(), false))  +
+                        " topVer=" + entry.topologyVersion());
+
                 pendingEvts.put(entry.updateCounter(), entry);
+            }
             else {
                 if (log.isDebugEnabled())
                     log.debug("Skip duplicate continuous query message: " + entry);
+
+                TestDebugLog.addEntryMessage(entry.partition(),
+                    entry.updateCounter(),
+                    "skip duplicate last=" + lastFiredEvt +
+                        " cntr=" + entry.updateCounter() +
+                        " key=" + (entry.isFiltered() ? "filtered" : entry.key().value(cctx.cacheObjectContext(), false))  +
+                        " val=" + (entry.isFiltered() ? "filtered" : entry.value().value(cctx.cacheObjectContext(), false))  +
+                        " topVer=" + entry.topologyVersion());
 
                 return Collections.emptyList();
             }
@@ -225,6 +253,15 @@ class CacheContinuousQueryPartitionRecovery {
                         fire = e.getKey() - filtered <= lastFiredEvt + 1;
 
                     if (fire) {
+                        TestDebugLog.addEntryMessage(entry.partition(),
+                            entry.updateCounter(),
+                            "process last=" + lastFiredEvt +
+                                " cntr=" + e.getKey() +
+                                " key=" + (pending.isFiltered() ? "filtered" : pending.key().value(cctx.cacheObjectContext(), false))  +
+                                " val=" + (pending.isFiltered() ? "filtered" : pending.value().value(cctx.cacheObjectContext(), false))  +
+                                " topVer=" + e.getValue().topologyVersion() +
+                                " f=" + pending.filteredCount());
+
                         lastFiredEvt = e.getKey();
 
                         if (e.getValue() != HOLE && !e.getValue().isFiltered())
@@ -232,8 +269,13 @@ class CacheContinuousQueryPartitionRecovery {
 
                         iter.remove();
                     }
-                    else
+                    else {
+                        TestDebugLog.addEntryMessage(entry.partition(),
+                            entry.updateCounter(),
+                            "stop process last=" + lastFiredEvt + " cntr=" + e.getKey() + " topVer=" + e.getValue().topologyVersion() + " f=" + pending.filteredCount());
+
                         break;
+                    }
                 }
             }
         }

@@ -87,17 +87,6 @@ public class CacheContinuousQueryEventBuffer {
         return null;
     }
 
-    /** */
-    private final int part;
-
-    public CacheContinuousQueryEventBuffer() {
-        part = 0;
-    }
-
-    public CacheContinuousQueryEventBuffer(int part) {
-        this.part = part;
-    }
-
     /**
      * @return Initial partition counter.
      */
