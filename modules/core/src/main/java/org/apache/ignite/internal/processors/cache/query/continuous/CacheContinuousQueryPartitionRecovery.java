@@ -41,7 +41,13 @@ import static org.apache.ignite.internal.processors.cache.query.continuous.Cache
  */
 class CacheContinuousQueryPartitionRecovery {
     /** Event which means hole in sequence. */
-    private static final CacheContinuousQueryEntry HOLE = new CacheContinuousQueryEntry();
+    private static final CacheContinuousQueryEntry HOLE;
+
+    static  {
+        HOLE = new CacheContinuousQueryEntry();
+
+        HOLE.markFiltered();
+    }
 
     /** */
     private final static int MAX_BUFF_SIZE = LSNR_MAX_BUF_SIZE;
@@ -56,7 +62,7 @@ class CacheContinuousQueryPartitionRecovery {
     private AffinityTopologyVersion curTop = AffinityTopologyVersion.NONE;
 
     /** */
-    private final Map<Long, CacheContinuousQueryEntry> pendingEvts = new TreeMap<>();
+    private final TreeMap<Long, CacheContinuousQueryEntry> pendingEvts = new TreeMap<>();
 
     /**
      * @param log Logger.
@@ -240,6 +246,8 @@ class CacheContinuousQueryPartitionRecovery {
                 }
             }
             else {
+                boolean skip = false;
+
                 while (iter.hasNext()) {
                     Map.Entry<Long, CacheContinuousQueryEntry> e = iter.next();
 
@@ -269,7 +277,9 @@ class CacheContinuousQueryPartitionRecovery {
 
                         iter.remove();
                     }
-                    else {
+                    else if (!pending.isFiltered()) {
+                        skip = true;
+
                         TestDebugLog.addEntryMessage(entry.partition(),
                             entry.updateCounter(),
                             "stop process last=" + lastFiredEvt + " cntr=" + e.getKey() + " topVer=" + e.getValue().topologyVersion() + " f=" + pending.filteredCount());
@@ -277,6 +287,9 @@ class CacheContinuousQueryPartitionRecovery {
                         break;
                     }
                 }
+
+                if (skip)
+                    pendingEvts.headMap(lastFiredEvt).clear();
             }
         }
 
