@@ -75,7 +75,6 @@ import org.apache.ignite.lang.IgniteBiTuple;
 import org.apache.ignite.lang.IgniteFuture;
 import org.apache.ignite.lang.IgniteInClosure;
 import org.apache.ignite.lang.IgnitePredicate;
-import org.apache.ignite.lang.IgniteProductVersion;
 import org.apache.ignite.lang.IgniteUuid;
 import org.apache.ignite.marshaller.Marshaller;
 import org.apache.ignite.plugin.extensions.communication.Message;
@@ -872,10 +871,10 @@ public class GridContinuousProcessor extends GridProcessorAdapter {
                 sendNotification(nodeId, routineId, null, toSnd, orderedTopic, true, null);
         }
         else {
-            LocalRoutineInfo localRoutineInfo = locInfos.get(routineId);
+            LocalRoutineInfo locRoutineInfo = locInfos.get(routineId);
 
-            if (localRoutineInfo != null)
-                localRoutineInfo.handler().notifyCallback(nodeId, routineId, objs, ctx);
+            if (locRoutineInfo != null)
+                locRoutineInfo.handler().notifyCallback(nodeId, routineId, objs, ctx);
         }
     }
 

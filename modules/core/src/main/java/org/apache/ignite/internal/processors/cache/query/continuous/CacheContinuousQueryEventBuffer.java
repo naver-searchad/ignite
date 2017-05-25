@@ -19,8 +19,11 @@ package org.apache.ignite.internal.processors.cache.query.continuous;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.ignite.IgniteSystemProperties;
@@ -36,10 +39,52 @@ public class CacheContinuousQueryEventBuffer {
         IgniteSystemProperties.getInteger("IGNITE_CONTINUOUS_QUERY_SERVER_BUFFER_SIZE", 5);
 
     /** */
+    protected final int part;
+
+    /**
+     * @param part Partition number.
+     */
+    CacheContinuousQueryEventBuffer(int part) {
+        this.part = part;
+    }
+
+    /** */
     private AtomicReference<Batch> curBatch = new AtomicReference<>();
 
     /** */
-    private ConcurrentSkipListMap<Long, Object> pending = new ConcurrentSkipListMap<>();
+    private ConcurrentLinkedDeque<CacheContinuousQueryEntry> backupQ = new ConcurrentLinkedDeque<>();
+
+    /** */
+    private ConcurrentSkipListMap<Long, CacheContinuousQueryEntry> pending = new ConcurrentSkipListMap<>();
+
+    /**
+     * @param updateCntr Acknowledged counter.
+     */
+    void cleanupBackupQueue(Long updateCntr) {
+        Iterator<CacheContinuousQueryEntry> it = backupQ.iterator();
+
+        while (it.hasNext()) {
+            CacheContinuousQueryEntry backupEntry = it.next();
+
+            if (backupEntry.updateCounter() <= updateCntr)
+                it.remove();
+        }
+    }
+
+    /**
+     * @return Backup entries.
+     */
+    @Nullable Collection<CacheContinuousQueryEntry> resetBackupQueue() {
+        if (!backupQ.isEmpty()) {
+            ConcurrentLinkedDeque<CacheContinuousQueryEntry> ret = this.backupQ;
+
+            backupQ = new ConcurrentLinkedDeque<>();
+
+            return ret;
+        }
+
+        return null;
+    }
 
     /**
      * @return Initial partition counter.
@@ -61,26 +106,20 @@ public class CacheContinuousQueryEventBuffer {
 
     /**
      * @param e Entry to process.
+     * @param backup Backup entry flag.
      * @return Collected entries to pass to listener (single entry or entries list).
      */
-    @Nullable Object processEntry(CacheContinuousQueryEntry e) {
-        return process0(e.updateCounter(), e);
+    @Nullable Object processEntry(CacheContinuousQueryEntry e, boolean backup) {
+        return process0(e.updateCounter(), e, backup);
     }
 
     /**
-     * @param cntr Filtered counter.
-     * @return Collected entries to pass to listener (single entry or entries list).
-     */
-    @Nullable Object processFiltered(long cntr) {
-        return process0(cntr, cntr);
-    }
-
-    /**
+     * @param backup Backup entry flag.
      * @param cntr Entry counter.
      * @param entry Entry.
      * @return Collected entries.
      */
-    private Object process0(long cntr, Object entry) {
+    private Object process0(long cntr, CacheContinuousQueryEntry entry, boolean backup) {
         assert cntr >= 0 : cntr;
 
         Batch batch = initBatch();
@@ -88,13 +127,16 @@ public class CacheContinuousQueryEventBuffer {
         if (batch == null || cntr < batch.startCntr) {
             assert entry != null : cntr;
 
+            if (backup)
+                backupQ.add(entry);
+
             return entry;
         }
 
         Object res = null;
 
         if (cntr <= batch.endCntr)
-            res = batch.processEvent0(null, cntr, entry);
+            res = batch.processEvent0(null, cntr, entry, backup);
         else
             pending.put(cntr, entry);
 
@@ -104,7 +146,7 @@ public class CacheContinuousQueryEventBuffer {
             do {
                 batch = batch0;
 
-                res = processPending(res, batch);
+                res = processPending(res, batch, backup);
 
                 batch0 = curBatch.get();
             }
@@ -139,17 +181,18 @@ public class CacheContinuousQueryEventBuffer {
     /**
      * @param res Current result.
      * @param batch Current batch.
+     * @param backup Backup entry flag.
      * @return New result.
      */
-    @Nullable private Object processPending(@Nullable Object res, Batch batch) {
+    @Nullable private Object processPending(@Nullable Object res, Batch batch, boolean backup) {
         if (pending.floorKey(batch.endCntr) != null) {
-            for (Map.Entry<Long, Object> p : pending.headMap(batch.endCntr, true).entrySet()) {
+            for (Map.Entry<Long, CacheContinuousQueryEntry> p : pending.headMap(batch.endCntr, true).entrySet()) {
                 long cntr = p.getKey();
 
                 assert cntr >= batch.startCntr && cntr <= batch.endCntr : cntr;
 
                 if (pending.remove(p.getKey()) != null)
-                    res = batch.processEvent0(res, p.getKey(), p.getValue());
+                    res = batch.processEvent0(res, p.getKey(), p.getValue(), backup);
             }
         }
 
@@ -195,13 +238,15 @@ public class CacheContinuousQueryEventBuffer {
          * @param res Current result.
          * @param cntr Event counter.
          * @param evt Event.
+         * @param backup Backup entry flag.
          * @return New result.
          */
         @SuppressWarnings("unchecked")
         @Nullable private Object processEvent0(
             @Nullable Object res,
             long cntr,
-            Object evt) {
+            CacheContinuousQueryEntry evt,
+            boolean backup) {
             int pos = (int)(cntr - startCntr);
 
             synchronized (this) {
@@ -224,9 +269,15 @@ public class CacheContinuousQueryEventBuffer {
 
                                     filtered = 0;
 
-                                    if (res == null)
-                                        res = evt0;
+                                    if (res == null) {
+                                        if (backup)
+                                            backupQ.add(evt0);
+                                        else
+                                            res = evt0;
+                                    }
                                     else {
+                                        assert !backup;
+
                                         List<CacheContinuousQueryEntry> resList;
 
                                         if (res instanceof CacheContinuousQueryEntry) {
