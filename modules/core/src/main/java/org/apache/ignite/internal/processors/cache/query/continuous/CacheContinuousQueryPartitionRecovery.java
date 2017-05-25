@@ -38,7 +38,13 @@ import org.jetbrains.annotations.Nullable;
  */
 class CacheContinuousQueryPartitionRecovery {
     /** Event which means hole in sequence. */
-    private static final CacheContinuousQueryEntry HOLE = new CacheContinuousQueryEntry();
+    private static final CacheContinuousQueryEntry HOLE;
+
+    static  {
+        HOLE = new CacheContinuousQueryEntry();
+
+        HOLE.markFiltered();
+    }
 
     /** */
     private final static int MAX_BUFF_SIZE = CacheContinuousQueryHandler.LSNR_MAX_BUF_SIZE;
@@ -53,7 +59,7 @@ class CacheContinuousQueryPartitionRecovery {
     private AffinityTopologyVersion curTop = AffinityTopologyVersion.NONE;
 
     /** */
-    private final Map<Long, CacheContinuousQueryEntry> pendingEvts = new TreeMap<>();
+    private final TreeMap<Long, CacheContinuousQueryEntry> pendingEvts = new TreeMap<>();
 
     /**
      * @param log Logger.
@@ -212,6 +218,8 @@ class CacheContinuousQueryPartitionRecovery {
                 }
             }
             else {
+                boolean skippedFiltered = false;
+
                 while (iter.hasNext()) {
                     Map.Entry<Long, CacheContinuousQueryEntry> e = iter.next();
 
@@ -232,9 +240,16 @@ class CacheContinuousQueryPartitionRecovery {
 
                         iter.remove();
                     }
-                    else
-                        break;
+                    else {
+                        if (pending.isFiltered())
+                            skippedFiltered = true;
+                        else
+                            break;
+                    }
                 }
+
+                if (skippedFiltered)
+                    pendingEvts.headMap(lastFiredEvt).clear();
             }
         }
 
