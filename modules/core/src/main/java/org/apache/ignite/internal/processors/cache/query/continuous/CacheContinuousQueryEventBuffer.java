@@ -41,13 +41,6 @@ public class CacheContinuousQueryEventBuffer {
     /** */
     protected final int part;
 
-    /**
-     * @param part Partition number.
-     */
-    CacheContinuousQueryEventBuffer(int part) {
-        this.part = part;
-    }
-
     /** */
     private AtomicReference<Batch> curBatch = new AtomicReference<>();
 
@@ -56,6 +49,13 @@ public class CacheContinuousQueryEventBuffer {
 
     /** */
     private ConcurrentSkipListMap<Long, CacheContinuousQueryEntry> pending = new ConcurrentSkipListMap<>();
+
+    /**
+     * @param part Partition number.
+     */
+    CacheContinuousQueryEventBuffer(int part) {
+        this.part = part;
+    }
 
     /**
      * @param updateCntr Acknowledged counter.
