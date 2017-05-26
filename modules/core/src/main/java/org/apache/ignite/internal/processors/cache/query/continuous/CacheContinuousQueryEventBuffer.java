@@ -112,8 +112,9 @@ public class CacheContinuousQueryEventBuffer {
                 ret.addAll(pending.values());
             }
 
-            if (curBatch.compareAndSet(batch, null))
-                break;
+            break;
+//            if (curBatch.compareAndSet(batch, null))
+//                break;
         }
 
         return ret;
@@ -235,11 +236,52 @@ public class CacheContinuousQueryEventBuffer {
             for (Map.Entry<Long, CacheContinuousQueryEntry> p : pending.headMap(batch.endCntr, true).entrySet()) {
                 long cntr = p.getKey();
 
-                assert cntr >= batch.startCntr && cntr <= batch.endCntr : cntr;
+                assert cntr <= batch.endCntr;
 
-                if (pending.remove(p.getKey()) != null)
-                    res = batch.processEntry0(res, p.getKey(), p.getValue(), backup);
+                if (pending.remove(p.getKey()) != null) {
+                    if (cntr < batch.startCntr)
+                        res = addResult(res, p.getValue(), backup);
+                    else
+                        res = batch.processEntry0(res, p.getKey(), p.getValue(), backup);
+                }
             }
+        }
+
+        return res;
+    }
+
+    /**
+     * @param res Current result.
+     * @param entry Entry to add.
+     * @param backup Backup entry flag.
+     * @return Updated result.
+     */
+    @Nullable private Object addResult(@Nullable Object res, CacheContinuousQueryEntry entry, boolean backup) {
+        if (res == null) {
+            if (backup)
+                backupQ.add(entry);
+            else
+                res = entry;
+        }
+        else {
+            assert !backup;
+
+            List<CacheContinuousQueryEntry> resList;
+
+            if (res instanceof CacheContinuousQueryEntry) {
+                resList = new ArrayList<>();
+
+                resList.add((CacheContinuousQueryEntry)res);
+            }
+            else {
+                assert res instanceof List : res;
+
+                resList = (List<CacheContinuousQueryEntry>)res;
+            }
+
+            resList.add(entry);
+
+            res = resList;
         }
 
         return res;
@@ -313,7 +355,15 @@ public class CacheContinuousQueryEventBuffer {
                     if (e.isFiltered())
                         filtered++;
                     else {
-                        flushEntry = e;
+                        flushEntry = new CacheContinuousQueryEntry(e.cacheId(),
+                            e.eventType(),
+                            e.key(),
+                            e.value(),
+                            e.oldValue(),
+                            e.isKeepBinary(),
+                            e.partition(),
+                            e.updateCounter(),
+                            e.topologyVersion());
 
                         flushEntry.filteredCount(filtered);
 
@@ -337,8 +387,6 @@ public class CacheContinuousQueryEventBuffer {
 
                 res.add(filteredEntry(cntr - 1, filtered - 1));
             }
-
-            entries = null;
 
             return res;
         }
@@ -399,32 +447,7 @@ public class CacheContinuousQueryEventBuffer {
 
                                 filtered = 0;
 
-                                if (res == null) {
-                                    if (backup)
-                                        backupQ.add(entry0);
-                                    else
-                                        res = entry0;
-                                }
-                                else {
-                                    assert !backup;
-
-                                    List<CacheContinuousQueryEntry> resList;
-
-                                    if (res instanceof CacheContinuousQueryEntry) {
-                                        resList = new ArrayList<>();
-
-                                        resList.add((CacheContinuousQueryEntry)res);
-                                    }
-                                    else {
-                                        assert res instanceof List : res;
-
-                                        resList = (List<CacheContinuousQueryEntry>)res;
-                                    }
-
-                                    resList.add(entry0);
-
-                                    res = resList;
-                                }
+                                res = addResult(res, entry0, backup);
                             }
                             else
                                 filtered++;
