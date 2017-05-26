@@ -28,7 +28,6 @@ import javax.cache.Cache;
 import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.processor.EntryProcessor;
 import javax.cache.processor.EntryProcessorResult;
-
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteException;
@@ -61,8 +60,8 @@ import org.apache.ignite.internal.processors.cache.version.GridCacheVersionConfl
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersionEx;
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersionedEntryEx;
 import org.apache.ignite.internal.processors.dr.GridDrType;
-import org.apache.ignite.internal.util.IgniteTree;
 import org.apache.ignite.internal.processors.query.schema.SchemaIndexCacheVisitorClosure;
+import org.apache.ignite.internal.util.IgniteTree;
 import org.apache.ignite.internal.util.lang.GridClosureException;
 import org.apache.ignite.internal.util.lang.GridMetadataAwareAdapter;
 import org.apache.ignite.internal.util.lang.GridTuple;
@@ -3413,7 +3412,7 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
                     if (obsoleteVersionExtras() != null)
                         return true;
 
-                    // TODO GG-11241: need keep removed entries in heap map, otherwise removes can be lost.
+                    // TODO IGNITE-5286: need keep removed entries in heap map, otherwise removes can be lost.
                     if (cctx.deferredDelete() && deletedUnlocked())
                         return false;
 
@@ -3456,7 +3455,7 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
                             // Version has changed since entry passed the filter. Do it again.
                             continue;
 
-                        // TODO GG-11241: need keep removed entries in heap map, otherwise removes can be lost.
+                        // TODO IGNITE-5286: need keep removed entries in heap map, otherwise removes can be lost.
                         if (cctx.deferredDelete() && deletedUnlocked())
                             return false;
 

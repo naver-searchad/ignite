@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.ignite.IgniteSystemProperties;
@@ -31,15 +30,18 @@ import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.spi.communication.tcp.TestDebugLog;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.jetbrains.annotations.Nullable;
+import org.jsr166.ConcurrentLinkedDeque8;
 
 /**
  *
  */
 public class CacheContinuousQueryEventBuffer {
     /** */
-    // TODO increase to 1000
     private static final int BUF_SIZE =
-        IgniteSystemProperties.getInteger("IGNITE_CONTINUOUS_QUERY_SERVER_BUFFER_SIZE", 5);
+        IgniteSystemProperties.getInteger("IGNITE_CONTINUOUS_QUERY_SERVER_BUFFER_SIZE", 1000);
+
+    /** */
+    private static final Object RETRY = new Object();
 
     /** */
     protected final int part;
@@ -48,7 +50,7 @@ public class CacheContinuousQueryEventBuffer {
     private AtomicReference<Batch> curBatch = new AtomicReference<>();
 
     /** */
-    private ConcurrentLinkedDeque<CacheContinuousQueryEntry> backupQ = new ConcurrentLinkedDeque<>();
+    private ConcurrentLinkedDeque8<CacheContinuousQueryEntry> backupQ = new ConcurrentLinkedDeque8<>();
 
     /** */
     private ConcurrentSkipListMap<Long, CacheContinuousQueryEntry> pending = new ConcurrentSkipListMap<>();
@@ -77,26 +79,36 @@ public class CacheContinuousQueryEventBuffer {
     /**
      * @return Backup entries.
      */
-    @Nullable Collection<CacheContinuousQueryEntry> resetBackupQueue() {
-        Collection<CacheContinuousQueryEntry> ret;
-
-        List<CacheContinuousQueryEntry> entries = null;
+    @Nullable Collection<CacheContinuousQueryEntry> flushOnExchange() {
+        Collection<CacheContinuousQueryEntry> ret = null;
 
         Batch batch = curBatch.get();
 
         if (batch != null)
-            entries = batch.backupFlushEntries();
+            ret = batch.flushCurrentEntries();
 
-        if (!backupQ.isEmpty()) {
-            if (entries != null)
-                backupQ.addAll(entries);
+        int size = backupQ.sizex();
 
-            ret = this.backupQ;
+        if (size > 0) {
+            if (ret == null)
+                ret = new ArrayList<>();
 
-            backupQ = new ConcurrentLinkedDeque<>();
+            for (int i = 0; i < size; i++) {
+                CacheContinuousQueryEntry e = backupQ.pollFirst();
+
+                if (e != null)
+                    ret.add(e);
+                else
+                    break;
+            }
         }
-        else
-            ret = entries;
+
+        if (!pending.isEmpty()) {
+            if (ret == null)
+                ret = new ArrayList<>();
+
+            ret.addAll(pending.values());
+        }
 
         if (ret != null) {
             for (CacheContinuousQueryEntry e : ret)
@@ -145,33 +157,39 @@ public class CacheContinuousQueryEventBuffer {
     private Object process0(long cntr, CacheContinuousQueryEntry entry, boolean backup) {
         assert cntr >= 0 : cntr;
 
-        Batch batch = initBatch(entry.topologyVersion());
+        Batch batch;
+        Object res = null;
 
-        if (batch == null || cntr < batch.startCntr) {
-            if (backup)
-                backupQ.add(entry);
+        for (;;) {
+            batch = initBatch(entry.topologyVersion());
+
+            if (batch == null || cntr < batch.startCntr) {
+                if (backup)
+                    backupQ.add(entry);
 
             TestDebugLog.addEntryMessage(part,
                 cntr,
                 "buffer rcd small start=" + batch.startCntr +
                     " cntr=" + cntr +
                     ", backup=" + backup +
-                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());
-
-            return entry;
+                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());return entry;
         }
 
-        Object res = null;
+            if (cntr <= batch.endCntr) {
+                res = batch.processEntry0(null, cntr, entry, backup);
 
-        if (cntr <= batch.endCntr)
-            res = batch.processEvent0(null, cntr, entry, backup);
-        else {
+        if (
+            res = = RETRY)
+                    continue;
+            }
+        else{
             TestDebugLog.addEntryMessage(part,
                 cntr,
                 "buffer add pending start=" + batch.startCntr +
                     " cntr=" + cntr +
-                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());
-            pending.put(cntr, entry);
+                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());pending.put(cntr, entry);}
+
+            break;
         }
 
         Batch batch0 = curBatch.get();
@@ -182,7 +200,7 @@ public class CacheContinuousQueryEventBuffer {
 
                 res = processPending(res, batch, backup);
 
-                batch0 = curBatch.get();
+                batch0 = initBatch(entry.topologyVersion());
             }
             while (batch != batch0);
         }
@@ -200,19 +218,22 @@ public class CacheContinuousQueryEventBuffer {
         if (batch != null)
             return batch;
 
-        long curCntr = currentPartitionCounter();
+        for (;;) {
+            long curCntr = currentPartitionCounter();
 
-        if (curCntr == -1)
-            return null;
+            if (curCntr == -1)
+                return null;
 
-        TestDebugLog.addEntryMessage(part, curCntr, "created batch");
+        TestDebugLog.addEntryMessage(part, curCntr, "created batch");batch = new Batch(curCntr + 1, 0L, new CacheContinuousQueryEntry[BUF_SIZE], topVer);
 
-        batch = new Batch(curCntr + 1, 0L, new CacheContinuousQueryEntry[BUF_SIZE], topVer);
+            if (curBatch.compareAndSet(null, batch))
+                return batch;
 
-        if (curBatch.compareAndSet(null, batch))
-            return batch;
+            batch = curBatch.get();
 
-        return curBatch.get();
+            if (batch != null)
+                return batch;
+        }
     }
 
     /**
@@ -226,11 +247,52 @@ public class CacheContinuousQueryEventBuffer {
             for (Map.Entry<Long, CacheContinuousQueryEntry> p : pending.headMap(batch.endCntr, true).entrySet()) {
                 long cntr = p.getKey();
 
-                assert cntr >= batch.startCntr && cntr <= batch.endCntr : cntr;
+                assert cntr <= batch.endCntr;
 
-                if (pending.remove(p.getKey()) != null)
-                    res = batch.processEvent0(res, p.getKey(), p.getValue(), backup);
+                if (pending.remove(p.getKey()) != null) {
+                    if (cntr < batch.startCntr)
+                        res = addResult(res, p.getValue(), backup);
+                    else
+                        res = batch.processEntry0(res, p.getKey(), p.getValue(), backup);
+                }
             }
+        }
+
+        return res;
+    }
+
+    /**
+     * @param res Current result.
+     * @param entry Entry to add.
+     * @param backup Backup entry flag.
+     * @return Updated result.
+     */
+    @Nullable private Object addResult(@Nullable Object res, CacheContinuousQueryEntry entry, boolean backup) {
+        if (res == null) {
+            if (backup)
+                backupQ.add(entry);
+            else
+                res = entry;
+        }
+        else {
+            assert !backup;
+
+            List<CacheContinuousQueryEntry> resList;
+
+            if (res instanceof CacheContinuousQueryEntry) {
+                resList = new ArrayList<>();
+
+                resList.add((CacheContinuousQueryEntry)res);
+            }
+            else {
+                assert res instanceof List : res;
+
+                resList = (List<CacheContinuousQueryEntry>)res;
+            }
+
+            resList.add(entry);
+
+            res = resList;
         }
 
         return res;
@@ -253,7 +315,7 @@ public class CacheContinuousQueryEventBuffer {
         private int lastProc = -1;
 
         /** */
-        private final CacheContinuousQueryEntry[] entries;
+        private CacheContinuousQueryEntry[] entries;
 
         /** */
         private final AffinityTopologyVersion topVer;
@@ -279,7 +341,10 @@ public class CacheContinuousQueryEventBuffer {
         /**
          * @return Entries to send as part of backup queue.
          */
-        @Nullable synchronized List<CacheContinuousQueryEntry> backupFlushEntries() {
+        @Nullable synchronized List<CacheContinuousQueryEntry> flushCurrentEntries() {
+            if (entries == null)
+                return null;
+
             List<CacheContinuousQueryEntry> res = null;
 
             long filtered = this.filtered;
@@ -309,7 +374,8 @@ public class CacheContinuousQueryEventBuffer {
                             e.isKeepBinary(),
                             e.partition(),
                             e.updateCounter(),
-                            e.topologyVersion());
+                            e.topologyVersion(),
+                            e.flags());
 
                         flushEntry.filteredCount(filtered);
 
@@ -345,13 +411,14 @@ public class CacheContinuousQueryEventBuffer {
         private CacheContinuousQueryEntry filteredEntry(long cntr, long filtered) {
             CacheContinuousQueryEntry e = new CacheContinuousQueryEntry(0,
                 null,
-                 null,
-                 null,
-                 null,
-                 false,
-                 part,
-                 cntr,
-                 topVer);
+                null,
+                null,
+                null,
+                false,
+                part,
+                cntr,
+                topVer,
+                (byte)0);
 
             e.markFiltered();
 
@@ -368,7 +435,7 @@ public class CacheContinuousQueryEventBuffer {
          * @return New result.
          */
         @SuppressWarnings("unchecked")
-        @Nullable private Object processEvent0(
+        @Nullable private Object processEntry0(
             @Nullable Object res,
             long cntr,
             CacheContinuousQueryEntry entry,
@@ -376,6 +443,9 @@ public class CacheContinuousQueryEventBuffer {
             int pos = (int)(cntr - startCntr);
 
             synchronized (this) {
+                if (entries == null)
+                    return RETRY;
+
                 TestDebugLog.addEntryMessage(part,
                     cntr,
                     "buffer process start=" + startCntr +
@@ -405,32 +475,7 @@ public class CacheContinuousQueryEventBuffer {
 
                                 filtered = 0;
 
-                                if (res == null) {
-                                    if (backup)
-                                        backupQ.add(entry0);
-                                    else
-                                        res = entry0;
-                                }
-                                else {
-                                    assert !backup;
-
-                                    List<CacheContinuousQueryEntry> resList;
-
-                                    if (res instanceof CacheContinuousQueryEntry) {
-                                        resList = new ArrayList<>();
-
-                                        resList.add((CacheContinuousQueryEntry)res);
-                                    }
-                                    else {
-                                        assert res instanceof List : res;
-
-                                        resList = (List<CacheContinuousQueryEntry>)res;
-                                    }
-
-                                    resList.add(entry0);
-
-                                    res = resList;
-                                }
+                                res = addResult(res, entry0, backup);
                             }
                             else {
                                 filtered++;
@@ -451,17 +496,24 @@ public class CacheContinuousQueryEventBuffer {
                     }
 
                     lastProc = pos;
+
+                    if (pos == entries.length - 1) {
+                        Arrays.fill(entries, null);
+
+                        Batch nextBatch = new Batch(this.startCntr + BUF_SIZE,
+                            filtered,
+                            entries,
+                            entry.topologyVersion());
+
+                        entries = null;
+
+                        assert curBatch.get() == this;
+
+                        curBatch.set(nextBatch);
+                    }
                 }
                 else
                     return res;
-            }
-
-            if (pos == entries.length -1) {
-                Arrays.fill(entries, null);
-
-                Batch nextBatch = new Batch(this.startCntr + BUF_SIZE, filtered, entries, entry.topologyVersion());
-
-                curBatch.set(nextBatch);
             }
 
             return res;

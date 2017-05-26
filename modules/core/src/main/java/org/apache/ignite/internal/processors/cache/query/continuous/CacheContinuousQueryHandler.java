@@ -453,7 +453,7 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
                     for (Map.Entry<Integer, CacheContinuousQueryEventBuffer> bufE : entryBufs.entrySet()) {
                         CacheContinuousQueryEventBuffer buf = bufE.getValue();
 
-                        Collection<CacheContinuousQueryEntry> backupQueue = buf.resetBackupQueue();
+                        Collection<CacheContinuousQueryEntry> backupQueue = buf.flushOnExchange();
 
                         if (backupQueue != null && node != null) {
                             for (CacheContinuousQueryEntry e : backupQueue) {
@@ -959,7 +959,7 @@ public class CacheContinuousQueryHandler<K, V> implements GridContinuousHandler 
         for (Map.Entry<Integer, CacheContinuousQueryEventBuffer> bufE : entryBufs.entrySet()) {
             CacheContinuousQueryEventBuffer buf = bufE.getValue();
 
-            buf.resetBackupQueue();
+            buf.flushOnExchange();
         }
     }
 
