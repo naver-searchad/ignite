@@ -81,40 +81,26 @@ public class CacheContinuousQueryEventBuffer {
     @Nullable Collection<CacheContinuousQueryEntry> flushOnExchange() {
         Collection<CacheContinuousQueryEntry> ret = null;
 
-        for (;;) {
-            Batch batch = curBatch.get();
+        Batch batch = curBatch.get();
 
-            if (batch != null) {
-                Collection<CacheContinuousQueryEntry> ret0 = batch.flushAndReset();
+        if (batch != null)
+            ret = batch.flushCurrentEntries();
 
-                if (ret0 != null) {
-                    if (ret == null)
-                        ret = ret0;
-                    else
-                        ret.addAll(ret0);
-                }
-            }
+        if (!backupQ.isEmpty()) {
+            if (ret == null)
+                ret = new ArrayList<>();
 
-            if (!backupQ.isEmpty()) {
-                if (ret == null)
-                    ret = new ArrayList<>();
+            CacheContinuousQueryEntry e;
 
-                CacheContinuousQueryEntry e;
+            while ((e = backupQ.pollFirst()) != null)
+                ret.add(e);
+        }
 
-                while ((e = backupQ.pollFirst()) != null)
-                    ret.add(e);
-            }
+        if (!pending.isEmpty()) {
+            if (ret == null)
+                ret = new ArrayList<>();
 
-            if (!pending.isEmpty()) {
-                if (ret == null)
-                    ret = new ArrayList<>();
-
-                ret.addAll(pending.values());
-            }
-
-            break;
-//            if (curBatch.compareAndSet(batch, null))
-//                break;
+            ret.addAll(pending.values());
         }
 
         return ret;
@@ -330,7 +316,7 @@ public class CacheContinuousQueryEventBuffer {
         /**
          * @return Entries to send as part of backup queue.
          */
-        @Nullable synchronized List<CacheContinuousQueryEntry> flushAndReset() {
+        @Nullable synchronized List<CacheContinuousQueryEntry> flushCurrentEntries() {
             if (entries == null)
                 return null;
 
