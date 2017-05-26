@@ -166,28 +166,31 @@ public class CacheContinuousQueryEventBuffer {
             if (batch == null || cntr < batch.startCntr) {
                 if (backup)
                     backupQ.add(entry);
+                TestDebugLog.addEntryMessage(part,
+                    cntr,
+                    "buffer rcd small start=" + batch.startCntr +
+                        " cntr=" + cntr +
+                        ", backup=" + backup +
+                        " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());
 
-            TestDebugLog.addEntryMessage(part,
-                cntr,
-                "buffer rcd small start=" + batch.startCntr +
-                    " cntr=" + cntr +
-                    ", backup=" + backup +
-                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());return entry;
-        }
+                return entry;
+            }
 
             if (cntr <= batch.endCntr) {
                 res = batch.processEntry0(null, cntr, entry, backup);
 
-        if (
-            res = = RETRY)
+                if (res == RETRY)
                     continue;
             }
-        else{
-            TestDebugLog.addEntryMessage(part,
-                cntr,
-                "buffer add pending start=" + batch.startCntr +
-                    " cntr=" + cntr +
-                    " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());pending.put(cntr, entry);}
+            else {
+                TestDebugLog.addEntryMessage(part,
+                    cntr,
+                    "buffer add pending start=" + batch.startCntr +
+                        " cntr=" + cntr +
+                        " topVer=" + ((CacheContinuousQueryEntry)entry).topologyVersion());
+
+                pending.put(cntr, entry);
+            }
 
             break;
         }

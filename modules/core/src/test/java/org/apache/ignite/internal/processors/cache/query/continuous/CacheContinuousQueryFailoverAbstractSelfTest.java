@@ -880,6 +880,8 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                 filtered = !filtered;
             }
 
+            TestDebugLog.addMessage("Stop node " + i);
+
             stopGrid(i);
 
             boolean check = GridTestUtils.waitForCondition(new PAX() {
@@ -894,6 +896,14 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                 keys0.removeAll(lsnr.keys);
 
                 log.info("Missed events for keys: " + keys0);
+
+                Integer k = keys0.iterator().next();
+
+                TestDebugLog.addEntryMessage(ignite(4).affinity(DEFAULT_CACHE_NAME).partition(k), null, "missed event");
+
+                TestDebugLog.printKeyMessages(true, ignite(4).affinity(DEFAULT_CACHE_NAME).partition(k));
+
+                System.exit(2);
 
                 fail("Failed to wait for notifications [exp=" + keys.size() + ", left=" + keys0.size() + ']');
             }
