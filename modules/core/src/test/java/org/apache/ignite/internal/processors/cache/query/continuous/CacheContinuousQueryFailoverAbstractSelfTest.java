@@ -840,7 +840,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
 
             IgniteCache<Object, Object> cache = ignite.cache(DEFAULT_CACHE_NAME);
 
-            List<Integer> keys = testKeys(cache, PARTS);
+            List<Integer> keys = testKeys(cache, 1);
 
             boolean first = true;
 
@@ -868,6 +868,8 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
                     if (!filtered)
                         expEvts.add(new T3<>((Object)key, (Object)val, (Object)key));
                 }
+
+                TestDebugLog.addEntryMessage(ignite(4).affinity(DEFAULT_CACHE_NAME).partition(key), filtered, "do put " + val);
 
                 cache.put(key, val);
 
@@ -1323,7 +1325,7 @@ public abstract class CacheContinuousQueryFailoverAbstractSelfTest extends GridC
 
         int[] nodeParts = aff.primaryPartitions(node);
 
-        final int KEYS_PER_PART = 50;
+        final int KEYS_PER_PART = 2;
 
         for (int i = 0; i < parts; i++) {
             int part = nodeParts[i];
