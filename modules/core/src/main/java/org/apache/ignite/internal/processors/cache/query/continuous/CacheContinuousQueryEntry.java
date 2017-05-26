@@ -128,6 +128,7 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
      * @param part Partition.
      * @param updateCntr Update partition counter.
      * @param topVer Topology version if applicable.
+     * @param flags Flags.
      */
     CacheContinuousQueryEntry(
         int cacheId,
@@ -138,7 +139,8 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
         boolean keepBinary,
         int part,
         long updateCntr,
-        @Nullable AffinityTopologyVersion topVer) {
+        @Nullable AffinityTopologyVersion topVer,
+        byte flags) {
         this.cacheId = cacheId;
         this.evtType = evtType;
         this.key = key;
@@ -147,9 +149,17 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
         this.part = part;
         this.updateCntr = updateCntr;
         this.topVer = topVer;
+        this.flags = flags;
 
         if (keepBinary)
-            flags |= KEEP_BINARY;
+            this.flags |= KEEP_BINARY;
+    }
+
+    /**
+     * @return Flags.
+     */
+    public byte flags() {
+        return flags;
     }
 
     /**
@@ -233,7 +243,7 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
         if (!isFiltered())
             return this;
 
-        CacheContinuousQueryEntry e = new CacheContinuousQueryEntry(
+        return new CacheContinuousQueryEntry(
             cacheId,
             null,
             null,
@@ -242,11 +252,8 @@ public class CacheContinuousQueryEntry implements GridCacheDeployable, Message {
             false,
             part,
             updateCntr,
-            topVer);
-
-        e.flags = flags;
-
-        return e;
+            topVer,
+            flags);
     }
 
     /**

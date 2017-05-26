@@ -35,7 +35,6 @@ import org.apache.ignite.internal.managers.communication.GridIoMessageFactory;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.CacheObjectImpl;
 import org.apache.ignite.internal.processors.cache.KeyCacheObjectImpl;
-import org.apache.ignite.internal.util.GridLongList;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
@@ -138,7 +137,8 @@ public class IgniteCacheContinuousQueryImmutableEntryTest extends GridCommonAbst
             true,
             1,
             1L,
-            new AffinityTopologyVersion(1L));
+            new AffinityTopologyVersion(1L),
+            (byte)0);
 
         e0.markFiltered();
 

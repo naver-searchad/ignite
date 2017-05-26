@@ -236,7 +236,7 @@ class CacheContinuousQueryPartitionRecovery {
                         lastFiredEvt = e.getKey();
 
                         if (e.getValue() != HOLE && !e.getValue().isFiltered())
-                            entries.add(new CacheContinuousQueryEvent<K, V>(cache, cctx, e.getValue()));
+                            entries.add(new CacheContinuousQueryEvent<K, V>(cache, cctx, pending));
 
                         iter.remove();
                     }

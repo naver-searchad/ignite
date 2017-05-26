@@ -120,8 +120,8 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
                 false,
                 0,
                 cntr,
-                null);
-
+                null,
+                (byte)0);
 
             entries.add(entry);
 
@@ -140,7 +140,8 @@ public class CacheContinuousQueryEventBufferTest extends GridCommonAbstractTest 
                     false,
                     0,
                     cntr,
-                    null);
+                    null,
+                    (byte)0);
 
                 expEntry.filteredCount(filtered);
 

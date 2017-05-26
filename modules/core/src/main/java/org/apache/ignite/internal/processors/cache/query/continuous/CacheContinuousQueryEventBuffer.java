@@ -363,7 +363,8 @@ public class CacheContinuousQueryEventBuffer {
                             e.isKeepBinary(),
                             e.partition(),
                             e.updateCounter(),
-                            e.topologyVersion());
+                            e.topologyVersion(),
+                            e.flags());
 
                         flushEntry.filteredCount(filtered);
 
@@ -399,13 +400,14 @@ public class CacheContinuousQueryEventBuffer {
         private CacheContinuousQueryEntry filteredEntry(long cntr, long filtered) {
             CacheContinuousQueryEntry e = new CacheContinuousQueryEntry(0,
                 null,
-                 null,
-                 null,
-                 null,
-                 false,
-                 part,
-                 cntr,
-                 topVer);
+                null,
+                null,
+                null,
+                false,
+                part,
+                cntr,
+                topVer,
+                (byte)0);
 
             e.markFiltered();
 
