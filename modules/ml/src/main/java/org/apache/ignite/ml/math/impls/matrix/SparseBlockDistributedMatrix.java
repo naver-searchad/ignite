@@ -25,48 +25,35 @@ import org.apache.ignite.ml.math.exceptions.UnsupportedOperationException;
 import org.apache.ignite.ml.math.functions.IgniteDoubleFunction;
 import org.apache.ignite.ml.math.functions.IgniteFunction;
 import org.apache.ignite.ml.math.impls.CacheUtils;
-import org.apache.ignite.ml.math.impls.storage.matrix.SparseDistributedMatrixStorage;
+import org.apache.ignite.ml.math.impls.storage.matrix.BlockMatrixStorage;
 
 /**
- * Sparse distributed matrix implementation based on data grid.
- * <p>
- * Unlike {@link CacheMatrix} that is based on existing cache, this implementation creates distributed
- * cache internally and doesn't rely on pre-existing cache.</p>
- * <p>
- * You also need to call {@link #destroy()} to remove the underlying cache when you no longer need this
- * matrix.</p>
- * <p>
- * <b>Currently fold supports only commutative operations.<b/></p>
+ * TODO: add description.
  */
-public class SparseDistributedMatrix extends AbstractMatrix implements StorageConstants {
+class SparseBlockDistributedMatrix  extends AbstractMatrix implements StorageConstants {
     /**
      *
      */
-    public SparseDistributedMatrix() {
+    public SparseBlockDistributedMatrix() {
         // No-op.
     }
 
     /**
      * @param rows Amount of rows in the matrix.
      * @param cols Amount of columns in the matrix.
-     * @param stoMode Matrix storage mode.
-     * @param acsMode Matrix elements access mode.
      */
-    public SparseDistributedMatrix(int rows, int cols, int stoMode, int acsMode) {
+    public SparseBlockDistributedMatrix(int rows, int cols) {
         assert rows > 0;
         assert cols > 0;
-        assertAccessMode(acsMode);
-        assertStorageMode(stoMode);
 
-        setStorage(new SparseDistributedMatrixStorage(rows, cols, stoMode, acsMode));
+        setStorage(new BlockMatrixStorage(rows, cols));
     }
 
     /**
      *
-     *
      */
-    private SparseDistributedMatrixStorage storage() {
-        return (SparseDistributedMatrixStorage)getStorage();
+    private BlockMatrixStorage storage() {
+        return (BlockMatrixStorage)getStorage();
     }
 
     /**
@@ -138,7 +125,7 @@ public class SparseDistributedMatrix extends AbstractMatrix implements StorageCo
 
     /** {@inheritDoc} */
     @Override public Matrix like(int rows, int cols) {
-        return new SparseDistributedMatrix(rows, cols, storage().storageMode(), storage().accessMode());
+        return new SparseBlockDistributedMatrix(rows, cols);
     }
 
     /** {@inheritDoc} */
@@ -148,6 +135,7 @@ public class SparseDistributedMatrix extends AbstractMatrix implements StorageCo
 
     /** */
     private IgniteUuid getUUID(){
-        return ((SparseDistributedMatrixStorage) getStorage()).getUUID();
+        return ((BlockMatrixStorage) getStorage()).getUUID();
     }
+
 }

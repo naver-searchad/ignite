@@ -33,6 +33,9 @@ public interface StorageConstants {
     /** Storage mode optimized for column access. */
     public static final int COLUMN_STORAGE_MODE = 2002;
 
+    /** Storage mode optimized for column access. */
+    public static final int BLOCK_STORAGE_MODE = 2003;
+
     /**
      * @param mode Access mode to verify.
      */
@@ -44,6 +47,6 @@ public interface StorageConstants {
      * @param mode Storage mode to verify.
      */
     public default void assertStorageMode(int mode) {
-        assert mode == ROW_STORAGE_MODE || mode == COLUMN_STORAGE_MODE;
+        assert mode == ROW_STORAGE_MODE || mode == COLUMN_STORAGE_MODE || mode == BLOCK_STORAGE_MODE;
     }
 }

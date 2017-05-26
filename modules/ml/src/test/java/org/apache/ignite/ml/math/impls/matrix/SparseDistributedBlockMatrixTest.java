@@ -28,23 +28,22 @@ import java.util.Set;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.internal.util.IgniteUtils;
-import org.apache.ignite.lang.IgniteBiTuple;
 import org.apache.ignite.lang.IgniteUuid;
 import org.apache.ignite.ml.math.Matrix;
-import org.apache.ignite.ml.math.StorageConstants;
 import org.apache.ignite.ml.math.exceptions.UnsupportedOperationException;
 import org.apache.ignite.ml.math.impls.MathTestConstants;
-import org.apache.ignite.ml.math.impls.storage.matrix.SparseDistributedMatrixStorage;
+import org.apache.ignite.ml.math.impls.storage.matrix.BlockMatrixKey;
+import org.apache.ignite.ml.math.impls.storage.matrix.BlockMatrixStorage;
 import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
 import org.apache.ignite.testframework.junits.common.GridCommonTest;
 
 import static org.apache.ignite.ml.math.impls.MathTestConstants.UNEXPECTED_VAL;
 
 /**
- * Tests for {@link SparseDistributedMatrix}.
+ * Tests for {@link SparseBlockDistributedMatrix}.
  */
 @GridCommonTest(group = "Distributed Models")
-public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
+public class SparseDistributedBlockMatrixTest extends GridCommonAbstractTest {
     /** Number of nodes in grid */
     private static final int NODE_COUNT = 3;
     /** Cache name. */
@@ -58,12 +57,12 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     /** Matrix cols */
     private final int cols = MathTestConstants.STORAGE_SIZE;
     /** Matrix for tests */
-    private SparseDistributedMatrix cacheMatrix;
+    private SparseBlockDistributedMatrix cacheMatrix;
 
     /**
      * Default constructor.
      */
-    public SparseDistributedMatrixTest() {
+    public SparseDistributedBlockMatrixTest() {
         super(false);
     }
 
@@ -101,7 +100,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testGetSet() throws Exception {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
 
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -117,7 +116,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testExternalize() throws IOException, ClassNotFoundException {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
 
         cacheMatrix.set(1, 1, 1.0);
 
@@ -129,7 +128,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
         ByteArrayInputStream byteArrInputStream = new ByteArrayInputStream(byteArrOutputStream.toByteArray());
         ObjectInputStream objInputStream = new ObjectInputStream(byteArrInputStream);
 
-        SparseDistributedMatrix objRestored = (SparseDistributedMatrix)objInputStream.readObject();
+        SparseBlockDistributedMatrix objRestored = (SparseBlockDistributedMatrix)objInputStream.readObject();
 
         assertTrue(MathTestConstants.VAL_NOT_EQUALS, cacheMatrix.equals(objRestored));
         assertEquals(MathTestConstants.VAL_NOT_EQUALS, objRestored.get(1, 1), 1.0, PRECISION);
@@ -139,7 +138,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testMath() {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
         initMtx(cacheMatrix);
 
         cacheMatrix.assign(2.0);
@@ -169,7 +168,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testMinMax() {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
 
         for (int i = 0; i < cacheMatrix.rowSize(); i++)
             for (int j = 0; j < cacheMatrix.columnSize(); j++)
@@ -197,7 +196,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testMap() {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
         initMtx(cacheMatrix);
 
         cacheMatrix.map(i -> 100.0);
@@ -210,7 +209,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testCopy() {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
 
         try {
             cacheMatrix.copy();
@@ -226,20 +225,20 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testCacheBehaviour(){
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        SparseDistributedMatrix cacheMatrix1 = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
-        SparseDistributedMatrix cacheMatrix2 = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        SparseBlockDistributedMatrix cacheMatrix1 = new SparseBlockDistributedMatrix(rows, cols);
+        SparseBlockDistributedMatrix cacheMatrix2 = new SparseBlockDistributedMatrix(rows, cols);
 
         initMtx(cacheMatrix1);
         initMtx(cacheMatrix2);
 
         Collection<String> cacheNames = ignite.cacheNames();
 
-        assert cacheNames.contains(SparseDistributedMatrixStorage.ML_CACHE_NAME);
+        assert cacheNames.contains(BlockMatrixStorage.ML_BLOCK_CACHE_NAME);
 
-        IgniteCache<IgniteBiTuple<Integer, IgniteUuid>, Object> cache = ignite.getOrCreateCache(SparseDistributedMatrixStorage.ML_CACHE_NAME);
+        IgniteCache<BlockMatrixKey, Object> cache = ignite.getOrCreateCache(BlockMatrixStorage.ML_BLOCK_CACHE_NAME);
 
-        Set<IgniteBiTuple<Integer, IgniteUuid>> keySet1 = buildKeySet(cacheMatrix1);
-        Set<IgniteBiTuple<Integer, IgniteUuid>> keySet2 = buildKeySet(cacheMatrix2);
+        Set<BlockMatrixKey> keySet1 = buildKeySet(cacheMatrix1);
+        Set<BlockMatrixKey> keySet2 = buildKeySet(cacheMatrix2);
 
         assert cache.containsKeys(keySet1);
         assert cache.containsKeys(keySet2);
@@ -258,7 +257,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testLike() {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
 
         assertNotNull(cacheMatrix.like(1, 1));
     }
@@ -267,7 +266,7 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
     public void testLikeVector() {
         IgniteUtils.setCurrentIgniteName(ignite.configuration().getIgniteInstanceName());
 
-        cacheMatrix = new SparseDistributedMatrix(rows, cols, StorageConstants.ROW_STORAGE_MODE, StorageConstants.RANDOM_ACCESS_MODE);
+        cacheMatrix = new SparseBlockDistributedMatrix(rows, cols);
 
         try {
             cacheMatrix.likeVector(1);
@@ -286,17 +285,18 @@ public class SparseDistributedMatrixTest extends GridCommonAbstractTest {
                 m.set(i, j, 1.0);
     }
 
-    /** Build key set for SparseDistributedMatrix. */
-    private Set<IgniteBiTuple<Integer, IgniteUuid>> buildKeySet(SparseDistributedMatrix m){
-        Set<IgniteBiTuple<Integer, IgniteUuid>> set = new HashSet<>();
+    /** Build key set for SparseBlockDistributedMatrix. */
+    private Set<BlockMatrixKey> buildKeySet(SparseBlockDistributedMatrix m){
+        Set<BlockMatrixKey> set = new HashSet<>();
 
-        SparseDistributedMatrixStorage storage = (SparseDistributedMatrixStorage)m.getStorage();
+        BlockMatrixStorage storage = (BlockMatrixStorage)m.getStorage();
 
         IgniteUuid uuid = storage.getUUID();
-        int size = storage.storageMode() == StorageConstants.ROW_STORAGE_MODE ? storage.rowSize() : storage.columnSize();
 
-        for (int i = 0; i < size; i++)
-            set.add(new IgniteBiTuple<>(i, uuid));
+        long maxBlock = (rows / 32 + rows % 32 > 0 ? 1 : 0) * (cols / 32 + cols % 32 > 0 ? 1 : 0);
+
+        for (long i = 0; i < maxBlock; i++)
+            set.add(new BlockMatrixKey(i,uuid,null));
 
         return set;
     }
