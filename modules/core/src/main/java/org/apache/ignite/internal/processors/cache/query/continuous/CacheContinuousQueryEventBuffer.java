@@ -23,12 +23,12 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.ignite.IgniteSystemProperties;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.jetbrains.annotations.Nullable;
+import org.jsr166.ConcurrentLinkedDeque8;
 
 /**
  *
@@ -48,7 +48,7 @@ public class CacheContinuousQueryEventBuffer {
     private AtomicReference<Batch> curBatch = new AtomicReference<>();
 
     /** */
-    private ConcurrentLinkedDeque<CacheContinuousQueryEntry> backupQ = new ConcurrentLinkedDeque<>();
+    private ConcurrentLinkedDeque8<CacheContinuousQueryEntry> backupQ = new ConcurrentLinkedDeque8<>();
 
     /** */
     private ConcurrentSkipListMap<Long, CacheContinuousQueryEntry> pending = new ConcurrentSkipListMap<>();
@@ -85,14 +85,20 @@ public class CacheContinuousQueryEventBuffer {
         if (batch != null)
             ret = batch.flushCurrentEntries();
 
-        if (!backupQ.isEmpty()) {
+        int size = backupQ.sizex();
+
+        if (size > 0) {
             if (ret == null)
                 ret = new ArrayList<>();
 
-            CacheContinuousQueryEntry e;
+            for (int i = 0; i < size; i++) {
+                CacheContinuousQueryEntry e = backupQ.pollFirst();
 
-            while ((e = backupQ.pollFirst()) != null)
-                ret.add(e);
+                if (e != null)
+                    ret.add(e);
+                else
+                    break;
+            }
         }
 
         if (!pending.isEmpty()) {
